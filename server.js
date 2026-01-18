@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* -------------------------
-   APP INIT (IMPORTANT)
+   APP INIT
 -------------------------- */
 const app = express();
 
@@ -27,14 +27,90 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 /* -------------------------
-   SUPABASE
+   SUPABASE CLIENTS
 -------------------------- */
-const supabase = createClient(
+// PUBLIC — real auth
+const supabaseAnon = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
+// ADMIN — profiles, verification, tiers
+const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 /* -------------------------
+   ROUTES
+-------------------------- */
+
+// SIGNUP — REAL USER CREATION
+app.post('/signup', async (req, res) => {
+  const { email, password, full_name } = req.body;
+
+  const { data, error } = await supabaseAnon.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) return res.status(400).json(error);
+
+  await supabaseAdmin
+    .from('profiles')
+    .update({ full_name })
+    .eq('id', data.user.id);
+
+  res.json({ success: true });
+});
+
+// LOGIN — REAL PASSWORD CHECK
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  const { data, error } = await supabaseAnon.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error)
+    return res.status(401).json({ error: 'Invalid email or password' });
+
+  const token = jwt.sign(
+    { user_id: data.user.id },
+    process.env.JWT_SECRET,
+    { expiresIn: '1d' }
+  );
+
+  res.json({ token });
+});
+
+/* -------------------------
+   AUTH GUARD
+-------------------------- */
+function authGuard(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.sendStatus(401);
+
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.sendStatus(403);
+  }
+}
+
+app.get('/protected', authGuard, (req, res) => {
+  res.json({ access: true });
+});
+
+/* -------------------------
+   SERVER START (RENDER)
+-------------------------- */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () =>
+  console.log(`✅ Server running on port ${PORT}`)
+);/* -------------------------
    ROUTES
 -------------------------- */
 app.post('/signup', async (req, res) => {
