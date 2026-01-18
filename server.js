@@ -1,26 +1,42 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
-import 'dotenv/config';
 
+dotenv.config();
 
+/* -------------------------
+   ESM __dirname FIX
+-------------------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(express.static(__dirname));
+/* -------------------------
+   APP INIT (IMPORTANT)
+-------------------------- */
 const app = express();
+
+/* -------------------------
+   MIDDLEWARE
+-------------------------- */
 app.use(cors());
 app.use(express.json());
+app.use(express.static(__dirname));
 
+/* -------------------------
+   SUPABASE
+-------------------------- */
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// SIGNUP
+/* -------------------------
+   ROUTES
+-------------------------- */
 app.post('/signup', async (req, res) => {
   const { email, password, full_name } = req.body;
 
@@ -32,16 +48,13 @@ app.post('/signup', async (req, res) => {
 
   if (error) return res.status(400).json(error);
 
-  await supabase.from('profiles').insert({
-    id: data.user.id,
-    email,
+  await supabase.from('profiles').update({
     full_name
-  });
+  }).eq('id', data.user.id);
 
   res.json({ success: true });
 });
 
-// LOGIN
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -61,7 +74,9 @@ app.post('/login', async (req, res) => {
   res.json({ token });
 });
 
-// AUTH MIDDLEWARE
+/* -------------------------
+   AUTH GUARD
+-------------------------- */
 function authGuard(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.sendStatus(401);
@@ -74,9 +89,14 @@ function authGuard(req, res, next) {
   }
 }
 
-// PROTECTED
 app.get('/protected', authGuard, (req, res) => {
-  res.json({ access: true });
+  res.json({ ok: true });
 });
 
-app.listen(3000, () => console.log('Server running'));
+/* -------------------------
+   SERVER START (RENDER)
+-------------------------- */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () =>
+  console.log(`✅ Server running on port ${PORT}`)
+);
