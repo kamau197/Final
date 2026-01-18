@@ -1,22 +1,33 @@
-<form id="signup">
-  <input placeholder="Full Name" id="name" />
-  <input placeholder="Email" id="email" />
-  <input type="password" placeholder="Password" id="password" />
-  <button>Sign Up</button>
-</form>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sign Up</title>
+</head>
+<body>
+
+<h2>Sign Up</h2>
+
+<input id="email" type="email" placeholder="Email" />
+<input id="password" type="password" placeholder="Password" />
+<input id="name" type="text" placeholder="Full name" />
+<button onclick="signup()">Create Account</button>
 
 <script>
-document.getElementById('signup').onsubmit = async e => {
-  e.preventDefault();
-  await fetch('/signup', {
+async function signup() {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const full_name = document.getElementById('name').value;
+
+  const res = await fetch('/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      full_name: name.value,
-      email: email.value,
-      password: password.value
-    })
+    body: JSON.stringify({ email, password, full_name })
   });
-  alert('Account created');
-};
+
+  const data = await res.json();
+  alert(JSON.stringify(data));
+}
 </script>
+
+</body>
+</html>
