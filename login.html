@@ -1,0 +1,21 @@
+<form id="login">
+  <input id="email" />
+  <input id="password" type="password" />
+  <button>Login</button>
+</form>
+
+<script>
+document.getElementById('login').onsubmit = async e => {
+  e.preventDefault();
+
+  const res = await fetch('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.value, password: password.value })
+  });
+
+  const data = await res.json();
+  localStorage.setItem('token', data.token);
+  window.location = 'listing6.6.html';
+};
+</script>

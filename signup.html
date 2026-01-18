@@ -1,0 +1,22 @@
+<form id="signup">
+  <input placeholder="Full Name" id="name" />
+  <input placeholder="Email" id="email" />
+  <input type="password" placeholder="Password" id="password" />
+  <button>Sign Up</button>
+</form>
+
+<script>
+document.getElementById('signup').onsubmit = async e => {
+  e.preventDefault();
+  await fetch('/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      full_name: name.value,
+      email: email.value,
+      password: password.value
+    })
+  });
+  alert('Account created');
+};
+</script>
