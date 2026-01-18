@@ -29,13 +29,13 @@ app.use(express.static(__dirname));
 /* -------------------------
    SUPABASE CLIENTS
 -------------------------- */
-// ANON KEY — real signup/login
+// PUBLIC client — real signup/login
 const supabaseAnon = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
-// SERVICE ROLE — admin operations
+// ADMIN client — profiles, verification, tiers
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -45,7 +45,7 @@ const supabaseAdmin = createClient(
    ROUTES
 -------------------------- */
 
-// SIGNUP — create real user
+// SIGN UP
 app.post('/signup', async (req, res) => {
   const { email, password, full_name } = req.body;
 
@@ -54,84 +54,11 @@ app.post('/signup', async (req, res) => {
     password
   });
 
-  if (error) return res.status(400).json(error);
-
-  // Update profile with full name using admin
-  await supabaseAdmin
-    .from('profiles')
-    .update({ full_name })
-    .eq('id', data.user.id);
-
-  res.json({ success: true });
-});
-
-// LOGIN — validate real password
-app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  const { data, error } = await supabaseAnon.auth.signInWithPassword({
-    email,
-    password
-  });
-
-  if (error) return res.status(401).json({ error: 'Invalid email or password' });
-
-  const token = jwt.sign(
-    { user_id: data.user.id },
-    process.env.JWT_SECRET,
-    { expiresIn: '1d' }
-  );
-
-  res.json({ token });
-});
-
-/* -------------------------
-   AUTH GUARD
--------------------------- */
-function authGuard(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.sendStatus(401);
-
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.sendStatus(403);
+  if (error) {
+    return res.status(400).json({ error: error.message });
   }
-}
 
-app.get('/protected', authGuard, (req, res) => {
-  res.json({ ok: true });
-});
-
-/* -------------------------
-   SERVER START (RENDER)
--------------------------- */
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT}`)
-);
-// ADMIN — profiles, verification, tiers
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-/* -------------------------
-   ROUTES
--------------------------- */
-
-// SIGNUP — REAL USER CREATION
-app.post('/signup', async (req, res) => {
-  const { email, password, full_name } = req.body;
-
-  const { data, error } = await supabaseAnon.auth.signUp({
-    email,
-    password
-  });
-
-  if (error) return res.status(400).json(error);
-
+  // Update profile with name (profile auto-created by trigger)
   await supabaseAdmin
     .from('profiles')
     .update({ full_name })
@@ -140,7 +67,7 @@ app.post('/signup', async (req, res) => {
   res.json({ success: true });
 });
 
-// LOGIN — REAL PASSWORD CHECK
+// LOGIN
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -149,8 +76,9 @@ app.post('/login', async (req, res) => {
     password
   });
 
-  if (error)
+  if (error) {
     return res.status(401).json({ error: 'Invalid email or password' });
+  }
 
   const token = jwt.sign(
     { user_id: data.user.id },
@@ -162,11 +90,13 @@ app.post('/login', async (req, res) => {
 });
 
 /* -------------------------
-   AUTH GUARD
+   AUTH MIDDLEWARE
 -------------------------- */
 function authGuard(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.sendStatus(401);
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.sendStatus(401);
+
+  const token = authHeader.split(' ')[1];
 
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
@@ -176,6 +106,7 @@ function authGuard(req, res, next) {
   }
 }
 
+// Example protected endpoint
 app.get('/protected', authGuard, (req, res) => {
   res.json({ access: true });
 });
@@ -184,71 +115,6 @@ app.get('/protected', authGuard, (req, res) => {
    SERVER START (RENDER)
 -------------------------- */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT}`)
-);/* -------------------------
-   ROUTES
--------------------------- */
-app.post('/signup', async (req, res) => {
-  const { email, password, full_name } = req.body;
-
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true
-  });
-
-  if (error) return res.status(400).json(error);
-
-  await supabase.from('profiles').update({
-    full_name
-  }).eq('id', data.user.id);
-
-  res.json({ success: true });
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });
-
-app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
-
-  if (error) return res.status(401).json(error);
-
-  const token = jwt.sign(
-    { user_id: data.user.id },
-    process.env.JWT_SECRET,
-    { expiresIn: '1d' }
-  );
-
-  res.json({ token });
-});
-
-/* -------------------------
-   AUTH GUARD
--------------------------- */
-function authGuard(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.sendStatus(401);
-
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.sendStatus(403);
-  }
-}
-
-app.get('/protected', authGuard, (req, res) => {
-  res.json({ ok: true });
-});
-
-/* -------------------------
-   SERVER START (RENDER)
--------------------------- */
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT}`)
-);
