@@ -18,7 +18,7 @@ app.use(express.static(__dirname));
 /* -------------------------
    SUPABASE CLIENTS
 -------------------------- */
-const supabase = createClient(
+const supabaseAnon = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
@@ -29,7 +29,7 @@ const supabaseAdmin = createClient(
 );
 
 /* -------------------------
-   SIGNUP
+   SIGNUP (REAL)
 -------------------------- */
 app.post('/signup', async (req, res) => {
   const { email, password, full_name } = req.body;
@@ -42,7 +42,7 @@ app.post('/signup', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
 
-  // 🔎 Check duplicate email
+  // 🔎 block duplicates
   const { data: existing } =
     await supabaseAdmin.auth.admin.getUserByEmail(email);
 
@@ -50,8 +50,8 @@ app.post('/signup', async (req, res) => {
     return res.status(409).json({ error: 'User already exists' });
   }
 
-  // ✅ Real Supabase signup
-  const { data, error } = await supabase.auth.signUp({
+  // ✅ Supabase signup
+  const { data, error } = await supabaseAnon.auth.signUp({
     email,
     password,
     options: {
@@ -59,27 +59,25 @@ app.post('/signup', async (req, res) => {
     }
   });
 
-  if (error) {
-    return res.status(400).json({ error: error.message });
+  if (error || !data.user) {
+    return res.status(400).json({ error: error?.message || 'Signup failed' });
   }
 
-  // Create profile row
-  if (data.user) {
-    await supabaseAdmin.from('profiles').insert({
-      id: data.user.id,
-      email,
-      full_name,
-      role: 'user',
-      tier: 'free',
-      verified: false
-    });
-  }
+  // create profile row
+  await supabaseAdmin.from('profiles').insert({
+    id: data.user.id,
+    email,
+    full_name,
+    role: 'user',
+    tier: 'free',
+    verified: false
+  });
 
-  res.json({ success: true, message: 'Account created' });
+  res.json({ success: true });
 });
 
 /* -------------------------
-   LOGIN
+   LOGIN (REAL)
 -------------------------- */
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -89,7 +87,7 @@ app.post('/login', async (req, res) => {
   }
 
   const { data, error } =
-    await supabase.auth.signInWithPassword({
+    await supabaseAnon.auth.signInWithPassword({
       email,
       password
     });
@@ -98,6 +96,7 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
+  // 🔑 return Supabase JWT
   res.json({
     access_token: data.session.access_token,
     user: data.user
@@ -105,30 +104,38 @@ app.post('/login', async (req, res) => {
 });
 
 /* -------------------------
-   CURRENT USER
+   AUTH GUARD (SUPABASE JWT)
 -------------------------- */
-app.get('/me', async (req, res) => {
+async function requireAuth(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.sendStatus(401);
 
-  const { data, error } = await supabase.auth.getUser(token);
+  const { data, error } = await supabaseAnon.auth.getUser(token);
 
   if (error || !data.user) return res.sendStatus(401);
 
+  req.user = data.user;
+  next();
+}
+
+/* -------------------------
+   CURRENT USER
+-------------------------- */
+app.get('/me', requireAuth, async (req, res) => {
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('*')
-    .eq('id', data.user.id)
+    .eq('id', req.user.id)
     .single();
 
   res.json({
-    user: data.user,
+    user: req.user,
     profile
   });
 });
 
 /* -------------------------
-   STATIC ROUTES
+   STATIC
 -------------------------- */
 app.get('/', (req, res) =>
   res.sendFile(path.join(__dirname, 'index.html'))
@@ -139,9 +146,9 @@ app.get('/listing6.6.html', (req, res) =>
 );
 
 /* -------------------------
-   START SERVER
+   START
 -------------------------- */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on ${PORT}`);
+  console.log('✅ Server running on', PORT);
 });
