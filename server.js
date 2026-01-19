@@ -1,9 +1,9 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createClient } from '@supabase/supabase-js';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -29,90 +29,118 @@ const supabaseAdmin = createClient(
 );
 
 /* -------------------------
-   SIGNUP (REAL)
+   SIGNUP
 -------------------------- */
-app.post('/signup', async (req, res) => {
-  const { email, password, full_name } = req.body;
+app.post("/signup", async (req, res) => {
+  try {
+    console.log("➡️ SIGNUP BODY:", req.body);
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password required' });
-  }
+    const { email, password, full_name } = req.body;
 
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  }
-
-  // 🔎 block duplicates
-  const { data: existing } =
-    await supabaseAdmin.auth.admin.getUserByEmail(email);
-
-  if (existing?.user) {
-    return res.status(409).json({ error: 'User already exists' });
-  }
-
-  // ✅ Supabase signup
-  const { data, error } = await supabaseAnon.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name }
+    if (!email || !password || !full_name) {
+      return res.status(400).json({ error: "All fields required" });
     }
-  });
 
-  if (error || !data.user) {
-    return res.status(400).json({ error: error?.message || 'Signup failed' });
-  }
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters" });
+    }
 
-  // create profile row
-  await supabaseAdmin.from('profiles').insert({
-    id: data.user.id,
-    email,
-    full_name,
-    role: 'user',
-    tier: 'free',
-    verified: false
-  });
+    // 🔎 block duplicate email
+    const { data: existing } =
+      await supabaseAdmin.auth.admin.getUserByEmail(email);
 
-  res.json({ success: true });
-});
+    if (existing?.user) {
+      return res.status(409).json({ error: "User already exists" });
+    }
 
-/* -------------------------
-   LOGIN (REAL)
--------------------------- */
-app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password required' });
-  }
-
-  const { data, error } =
-    await supabaseAnon.auth.signInWithPassword({
+    // ✅ Supabase Auth signup
+    const { data, error } = await supabaseAnon.auth.signUp({
       email,
-      password
+      password,
+      options: {
+        data: { full_name }
+      }
     });
 
-  if (error || !data.session) {
-    return res.status(401).json({ error: 'Invalid email or password' });
-  }
+    if (error || !data.user) {
+      console.error("❌ SUPABASE SIGNUP ERROR:", error);
+      return res
+        .status(400)
+        .json({ error: error?.message || "Signup failed" });
+    }
 
-  // 🔑 return Supabase JWT
-  res.json({
-    access_token: data.session.access_token,
-    user: data.user
-  });
+    // 🧾 create profile row
+    await supabaseAdmin.from("profiles").insert({
+      id: data.user.id,
+      email,
+      full_name,
+      role: "user",
+      tier: "free",
+      verified: false
+    });
+
+    console.log("✅ USER CREATED:", email);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("🔥 SIGNUP CRASH:", err);
+    res.status(500).json({ error: "Internal signup error" });
+  }
 });
 
 /* -------------------------
-   AUTH GUARD (SUPABASE JWT)
+   LOGIN
+-------------------------- */
+app.post("/login", async (req, res) => {
+  try {
+    console.log("➡️ LOGIN BODY:", req.body);
+
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password required" });
+    }
+
+    const { data, error } =
+      await supabaseAnon.auth.signInWithPassword({
+        email,
+        password
+      });
+
+    if (error || !data.session) {
+      console.error("❌ SUPABASE LOGIN ERROR:", error);
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    console.log("✅ LOGIN OK:", email);
+
+    res.json({
+      access_token: data.session.access_token,
+      user: data.user
+    });
+
+  } catch (err) {
+    console.error("🔥 LOGIN CRASH:", err);
+    res.status(500).json({ error: "Internal login error" });
+  }
+});
+
+/* -------------------------
+   SUPABASE JWT AUTH GUARD
 -------------------------- */
 async function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.sendStatus(401);
 
-  const { data, error } = await supabaseAnon.auth.getUser(token);
+  const { data, error } =
+    await supabaseAnon.auth.getUser(token);
 
-  if (error || !data.user) return res.sendStatus(401);
+  if (error || !data.user) {
+    return res.sendStatus(401);
+  }
 
   req.user = data.user;
   next();
@@ -121,12 +149,13 @@ async function requireAuth(req, res, next) {
 /* -------------------------
    CURRENT USER
 -------------------------- */
-app.get('/me', requireAuth, async (req, res) => {
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', req.user.id)
-    .single();
+app.get("/me", requireAuth, async (req, res) => {
+  const { data: profile } =
+    await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", req.user.id)
+      .single();
 
   res.json({
     user: req.user,
@@ -135,20 +164,20 @@ app.get('/me', requireAuth, async (req, res) => {
 });
 
 /* -------------------------
-   STATIC
+   STATIC ROUTES
 -------------------------- */
-app.get('/', (req, res) =>
-  res.sendFile(path.join(__dirname, 'index.html'))
+app.get("/", (req, res) =>
+  res.sendFile(path.join(__dirname, "index.html"))
 );
 
-app.get('/listing6.6.html', (req, res) =>
-  res.sendFile(path.join(__dirname, 'listing6.6.html'))
+app.get("/listing6.6.html", (req, res) =>
+  res.sendFile(path.join(__dirname, "listing6.6.html"))
 );
 
 /* -------------------------
-   START
+   START SERVER
 -------------------------- */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('✅ Server running on', PORT);
+  console.log("✅ Server running on port", PORT);
 });
