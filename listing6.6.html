@@ -432,6 +432,26 @@ body.sidebar-open #mainContent {
 </style>
 </head>
 <body>
+    <script>
+(async function () {
+  const token = localStorage.getItem('sb_jwt');
+  if (!token) {
+    location.replace('login.html');
+    return;
+  }
+
+  const res = await fetch('/me', {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!res.ok) {
+    localStorage.removeItem('sb_jwt');
+    location.replace('login.html');
+  }
+})();
+    </script>
 
 
 
