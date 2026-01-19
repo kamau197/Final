@@ -15,16 +15,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       { label: "Listings", link: "listing6.6.html" },
       { label: "Users", link: "users.html" }
     ],
-
     user: [
       { label: "Browse Listings", link: "listing6.6.html" },
       { label: "My Requests", link: "requests.html" }
     ],
-
     legal: [
       { label: "Legal Desk", link: "legal.html" },
-      { label: "Appeals", link: "appeals.html" },
-      { label: "Listings Review", link: "listing6.6.html" }
+      { label: "Appeals", link: "appeals.html" }
     ]
   };
 
