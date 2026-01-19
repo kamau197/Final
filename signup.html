@@ -13,27 +13,25 @@
 <button onclick="signup()">Create Account</button>
 <script>
 async function signup() {
-  const email = emailEl.value.trim();
-  const password = passwordEl.value;
   const full_name = nameEl.value.trim();
+  const email = emailEl.value.trim();
+  const password = passEl.value;
 
   const res = await fetch('/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, full_name })
+    body: JSON.stringify({ full_name, email, password })
   });
 
   const data = await res.json();
 
-  msg.innerText = data.error || data.message;
+  msg.innerText = data.error || 'Account created';
 
   if (res.ok) {
-    setTimeout(() => {
-      window.location.href = 'login.html';
-    }, 1000);
+    setTimeout(() => location.href = 'login.html', 1000);
   }
 }
-</script>
+    </script>
 
 </body>
 </html>
