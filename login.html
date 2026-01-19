@@ -7,11 +7,10 @@
 <input id="email" type="email" />
 <input id="password" type="password" />
 <button onclick="login()">Login</button>
-
 <script>
 async function login() {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
+  const email = emailEl.value.trim();
+  const password = passwordEl.value;
 
   const res = await fetch('/login', {
     method: 'POST',
@@ -22,12 +21,12 @@ async function login() {
   const data = await res.json();
 
   if (!res.ok) {
-    alert(data.error);
+    msg.innerText = data.error;
     return;
   }
 
   localStorage.setItem('token', data.access_token);
-  window.location.href = 'listing.html';
+  window.location.href = 'listing6.6.html';
 }
 </script>
 
