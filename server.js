@@ -7,53 +7,50 @@ import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
-/* -------------------------
-   ESM PATH FIX
--------------------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* -------------------------
-   APP INIT
--------------------------- */
 const app = express();
-
-/* -------------------------
-   MIDDLEWARE
--------------------------- */
 app.use(cors());
-app.use(express.json({ limit: '2mb' })); // 🔒 force JSON
+app.use(express.json());
 app.use(express.static(__dirname));
 
 /* -------------------------
-   SUPABASE (PUBLIC AUTH)
+   SUPABASE CLIENTS
 -------------------------- */
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
 /* -------------------------
    SIGNUP
 -------------------------- */
 app.post('/signup', async (req, res) => {
-  console.log('🔍 SIGNUP BODY:', req.body);
-
   const { email, password, full_name } = req.body;
 
-  // HARD VALIDATION (NO SILENT FAILS)
   if (!email || !password) {
-    return res.status(400).json({
-      error: 'Email and password are required'
-    });
+    return res.status(400).json({ error: 'Email and password required' });
   }
 
   if (password.length < 6) {
-    return res.status(400).json({
-      error: 'Password must be at least 6 characters'
-    });
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
 
+  // 🔎 Check duplicate email
+  const { data: existing } =
+    await supabaseAdmin.auth.admin.getUserByEmail(email);
+
+  if (existing?.user) {
+    return res.status(409).json({ error: 'User already exists' });
+  }
+
+  // ✅ Real Supabase signup
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -63,29 +60,32 @@ app.post('/signup', async (req, res) => {
   });
 
   if (error) {
-    console.error('❌ SIGNUP ERROR:', error.message);
     return res.status(400).json({ error: error.message });
   }
 
-  res.json({
-    success: true,
-    message: 'Account created successfully',
-    user_id: data.user?.id
-  });
+  // Create profile row
+  if (data.user) {
+    await supabaseAdmin.from('profiles').insert({
+      id: data.user.id,
+      email,
+      full_name,
+      role: 'user',
+      tier: 'free',
+      verified: false
+    });
+  }
+
+  res.json({ success: true, message: 'Account created' });
 });
 
 /* -------------------------
    LOGIN
 -------------------------- */
 app.post('/login', async (req, res) => {
-  console.log('🔍 LOGIN BODY:', req.body);
-
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({
-      error: 'Email and password are required'
-    });
+    return res.status(400).json({ error: 'Email and password required' });
   }
 
   const { data, error } =
@@ -94,14 +94,10 @@ app.post('/login', async (req, res) => {
       password
     });
 
-  if (error) {
-    console.error('❌ LOGIN ERROR:', error.message);
-    return res.status(401).json({
-      error: 'Invalid email or password'
-    });
+  if (error || !data.session) {
+    return res.status(401).json({ error: 'Invalid email or password' });
   }
 
-  // REAL SUPABASE JWT
   res.json({
     access_token: data.session.access_token,
     user: data.user
@@ -109,16 +105,43 @@ app.post('/login', async (req, res) => {
 });
 
 /* -------------------------
-   ROOT
+   CURRENT USER
 -------------------------- */
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+app.get('/me', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.sendStatus(401);
+
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data.user) return res.sendStatus(401);
+
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('*')
+    .eq('id', data.user.id)
+    .single();
+
+  res.json({
+    user: data.user,
+    profile
+  });
 });
+
+/* -------------------------
+   STATIC ROUTES
+-------------------------- */
+app.get('/', (req, res) =>
+  res.sendFile(path.join(__dirname, 'index.html'))
+);
+
+app.get('/listing6.6.html', (req, res) =>
+  res.sendFile(path.join(__dirname, 'listing6.6.html'))
+);
 
 /* -------------------------
    START SERVER
 -------------------------- */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`✅ Server running on ${PORT}`);
 });
