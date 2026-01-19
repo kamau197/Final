@@ -1,37 +1,55 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sign Up</title>
+  <meta charset="UTF-8">
+  <title>Signup</title>
 </head>
 <body>
 
-<h2>Sign Up</h2>
+<h2>Create Account</h2>
 
-<input id="email" type="email" placeholder="Email" />
-<input id="password" type="password" placeholder="Password" />
-<input id="name" type="text" placeholder="Full name" />
-<button onclick="signup()">Create Account</button>
+<input id="full_name" placeholder="Full name"><br><br>
+<input id="email" type="email" placeholder="Email"><br><br>
+<input id="password" type="password" placeholder="Password (min 6 chars)"><br><br>
+
+<button onclick="signup()">Sign up</button>
+
+<div id="msg" style="margin-top:10px;"></div>
+
 <script>
 async function signup() {
-  const full_name = nameEl.value.trim();
-  const email = emailEl.value.trim();
-  const password = passEl.value;
+  const full_name =
+    document.getElementById("full_name").value.trim();
+  const email =
+    document.getElementById("email").value.trim();
+  const password =
+    document.getElementById("password").value;
 
-  const res = await fetch('/signup', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const msg = document.getElementById("msg");
+  msg.innerText = "Creating account...";
+
+  const res = await fetch("/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ full_name, email, password })
   });
 
   const data = await res.json();
 
-  msg.innerText = data.error || 'Account created';
-
-  if (res.ok) {
-    setTimeout(() => location.href = 'login.html', 1000);
+  if (!res.ok) {
+    msg.innerText = data.error || "Signup failed";
+    msg.style.color = "red";
+    return;
   }
+
+  msg.innerText = "Account created. Redirecting...";
+  msg.style.color = "green";
+
+  setTimeout(() => {
+    location.href = "login.html";
+  }, 1200);
 }
-    </script>
+</script>
 
 </body>
 </html>
