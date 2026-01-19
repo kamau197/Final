@@ -431,7 +431,7 @@ body.sidebar-open #mainContent {
 }
 </style>
 </head>
-<body>
+<body onload="requireAuth()">
     <script>
 (async function () {
   const token = localStorage.getItem('sb_jwt');
