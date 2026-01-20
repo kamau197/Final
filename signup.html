@@ -25,13 +25,14 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       msg.textContent = "";
+      msg.style.color = "red";
 
-      const name = document.getElementById("name").value.trim();
+      const full_name = document.getElementById("name").value.trim();
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
 
       // 🔒 Client validation
-      if (!name || !email || !password) {
+      if (!full_name || !email || !password) {
         msg.textContent = "All fields are required.";
         return;
       }
@@ -42,10 +43,10 @@
       }
 
       try {
-        const res = await fetch("/api/signup", {
+        const res = await fetch("/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, password })
+          body: JSON.stringify({ full_name, email, password })
         });
 
         const data = await res.json();
