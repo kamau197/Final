@@ -1,55 +1,74 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Signup</title>
+  <meta charset="UTF-8" />
+  <title>Create Account</title>
 </head>
 <body>
 
-<h2>Create Account</h2>
+  <h2>Create Account</h2>
 
-<input id="full_name" placeholder="Full name"><br><br>
-<input id="email" type="email" placeholder="Email"><br><br>
-<input id="password" type="password" placeholder="Password (min 6 chars)"><br><br>
+  <form id="signupForm">
+    <input id="name" placeholder="Full name" required /><br><br>
+    <input id="email" type="email" placeholder="Email" required /><br><br>
+    <input id="password" type="password" placeholder="Password (min 6 chars)" required /><br><br>
 
-<button onclick="signup()">Sign up</button>
+    <button type="submit">Sign up</button>
+  </form>
 
-<div id="msg" style="margin-top:10px;"></div>
+  <p id="msg" style="color:red;"></p>
 
-<script>
-async function signup() {
-  const full_name =
-    document.getElementById("full_name").value.trim();
-  const email =
-    document.getElementById("email").value.trim();
-  const password =
-    document.getElementById("password").value;
+  <script>
+    const form = document.getElementById("signupForm");
+    const msg = document.getElementById("msg");
 
-  const msg = document.getElementById("msg");
-  msg.innerText = "Creating account...";
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "";
 
-  const res = await fetch("/signup", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ full_name, email, password })
-  });
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
 
-  const data = await res.json();
+      // 🔒 Client validation
+      if (!name || !email || !password) {
+        msg.textContent = "All fields are required.";
+        return;
+      }
 
-  if (!res.ok) {
-    msg.innerText = data.error || "Signup failed";
-    msg.style.color = "red";
-    return;
-  }
+      if (password.length < 6) {
+        msg.textContent = "Password must be at least 6 characters.";
+        return;
+      }
 
-  msg.innerText = "Account created. Redirecting...";
-  msg.style.color = "green";
+      try {
+        const res = await fetch("/api/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password })
+        });
 
-  setTimeout(() => {
-    location.href = "login.html";
-  }, 1200);
-}
-</script>
+        const data = await res.json();
+
+        if (!res.ok) {
+          msg.textContent = data.error || "Signup failed.";
+          return;
+        }
+
+        // ✅ success
+        msg.style.color = "green";
+        msg.textContent = "Account created. Redirecting to login…";
+
+        setTimeout(() => {
+          location.href = "/login.html";
+        }, 1200);
+
+      } catch (err) {
+        console.error("Signup error:", err);
+        msg.textContent = "Network error. Try again.";
+      }
+    });
+  </script>
 
 </body>
 </html>
