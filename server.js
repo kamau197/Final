@@ -22,6 +22,17 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 /* -------------------------
+   ENV SANITY CHECK
+-------------------------- */
+if (
+  !process.env.SUPABASE_URL ||
+  !process.env.SUPABASE_ANON_KEY ||
+  !process.env.SUPABASE_SERVICE_ROLE_KEY
+) {
+  console.error("❌ MISSING SUPABASE ENV VARS");
+}
+
+/* -------------------------
    SUPABASE CLIENTS
 -------------------------- */
 const supabaseAnon = createClient(
@@ -35,11 +46,15 @@ const supabaseAdmin = createClient(
 );
 
 /* -------------------------
-   SIGNUP (FIXED)
+   SIGNUP (HARDENED)
 -------------------------- */
 app.post("/signup", async (req, res) => {
   try {
     console.log("➡️ SIGNUP BODY:", req.body);
+    console.log(
+      "🔑 SERVICE KEY PRESENT:",
+      !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
 
     const { email, password, full_name } = req.body;
 
@@ -53,65 +68,67 @@ app.post("/signup", async (req, res) => {
         .json({ error: "Password must be at least 6 characters" });
     }
 
-    // 🔎 Check duplicate email via auth
+    /* 🔎 DUPLICATE EMAIL CHECK */
     const { data: existingUser, error: existErr } =
       await supabaseAdmin.auth.admin.getUserByEmail(email);
 
     if (existErr) {
       console.error("❌ EMAIL CHECK ERROR:", existErr);
-      return res.status(500).json({ error: "Email check failed" });
+      return res.status(500).json({ error: "Email lookup failed" });
     }
 
     if (existingUser?.user) {
       return res.status(409).json({ error: "User already exists" });
     }
 
-    // ✅ Create auth user (ADMIN — avoids email confirmation + policy issues)
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name }
-    });
+    /* ✅ CREATE AUTH USER (ADMIN) */
+    const { data, error } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name }
+      });
 
-    if (error || !data.user) {
-      console.error("❌ SUPABASE CREATE USER ERROR:", error);
+    if (error || !data?.user) {
+      console.error("❌ CREATE USER ERROR:", error);
       return res
-        .status(400)
-        .json({ error: error?.message || "Signup failed" });
+        .status(500)
+        .json({ error: error?.message || "Create user failed" });
     }
 
     const user = data.user;
 
-    // 🧾 Create profile row
+    /* 🧾 CREATE PROFILE ROW */
     const { error: profileErr } = await supabaseAdmin
       .from("profiles")
-      .insert([{
-        id: user.id,
-        email,
-        full_name,
-        role: "user",
-        tier: "free",
-        verified: false
-      }]);
+      .insert([
+        {
+          id: user.id,
+          email,
+          full_name,
+          role: "user",
+          tier: "free",
+          verified: false
+        }
+      ]);
 
     if (profileErr) {
       console.error("❌ PROFILE INSERT ERROR:", profileErr);
-      return res.status(500).json({ error: "Profile creation failed" });
+      return res.status(500).json({ error: "Profile insert failed" });
     }
 
     console.log("✅ USER CREATED:", email);
-
-    res.json({ success: true });
+    return res.json({ success: true });
 
   } catch (err) {
-    console.error("🔥 SIGNUP CRASH:", err);
-    res.status(500).json({ error: "Internal signup error" });
+    console.error("🔥 SIGNUP FATAL:", err);
+    return res.status(500).json({ error: "Internal signup error" });
   }
 });
 
 /* -------------------------
-   LOGIN (UNCHANGED, CORRECT)
+   LOGIN (CORRECT)
 -------------------------- */
 app.post("/login", async (req, res) => {
   try {
@@ -129,21 +146,21 @@ app.post("/login", async (req, res) => {
         password
       });
 
-    if (error || !data.session) {
+    if (error || !data?.session) {
       console.error("❌ SUPABASE LOGIN ERROR:", error);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
     console.log("✅ LOGIN OK:", email);
 
-    res.json({
+    return res.json({
       access_token: data.session.access_token,
       user: data.user
     });
 
   } catch (err) {
-    console.error("🔥 LOGIN CRASH:", err);
-    res.status(500).json({ error: "Internal login error" });
+    console.error("🔥 LOGIN FATAL:", err);
+    return res.status(500).json({ error: "Internal login error" });
   }
 });
 
@@ -151,18 +168,24 @@ app.post("/login", async (req, res) => {
    SUPABASE JWT AUTH GUARD
 -------------------------- */
 async function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.sendStatus(401);
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.sendStatus(401);
 
-  const { data, error } =
-    await supabaseAnon.auth.getUser(token);
+    const { data, error } =
+      await supabaseAnon.auth.getUser(token);
 
-  if (error || !data.user) {
+    if (error || !data?.user) {
+      return res.sendStatus(401);
+    }
+
+    req.user = data.user;
+    next();
+
+  } catch (err) {
+    console.error("🔥 AUTH GUARD ERROR:", err);
     return res.sendStatus(401);
   }
-
-  req.user = data.user;
-  next();
 }
 
 /* -------------------------
@@ -176,7 +199,7 @@ app.get("/me", requireAuth, async (req, res) => {
       .eq("id", req.user.id)
       .single();
 
-  res.json({
+  return res.json({
     user: req.user,
     profile
   });
