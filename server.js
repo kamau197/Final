@@ -24,13 +24,11 @@ app.use(express.static(__dirname));
 /* -------------------------
    ENV SANITY CHECK
 -------------------------- */
-if (
-  !process.env.SUPABASE_URL ||
-  !process.env.SUPABASE_ANON_KEY ||
-  !process.env.SUPABASE_SERVICE_ROLE_KEY
-) {
-  console.error("❌ MISSING SUPABASE ENV VARS");
-}
+console.log("🔍 ENV CHECK");
+console.log("SUPABASE_URL PRESENT:", !!process.env.SUPABASE_URL);
+console.log("SUPABASE_ANON_KEY PRESENT:", !!process.env.SUPABASE_ANON_KEY);
+console.log("SUPABASE_SERVICE_ROLE_KEY PRESENT:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+console.log("SERVICE ROLE KEY LENGTH:", process.env.SUPABASE_SERVICE_ROLE_KEY?.length);
 
 /* -------------------------
    SUPABASE CLIENTS
@@ -46,15 +44,13 @@ const supabaseAdmin = createClient(
 );
 
 /* -------------------------
-   SIGNUP (HARDENED)
+   SIGNUP (BULLETPROOF)
 -------------------------- */
 app.post("/signup", async (req, res) => {
   try {
     console.log("➡️ SIGNUP BODY:", req.body);
-    console.log(
-      "🔑 SERVICE KEY PRESENT:",
-      !!process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    console.log("🔑 SERVICE KEY PRESENT:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    console.log("🔑 SERVICE KEY LENGTH:", process.env.SUPABASE_SERVICE_ROLE_KEY?.length);
 
     const { email, password, full_name } = req.body;
 
