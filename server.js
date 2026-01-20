@@ -44,13 +44,11 @@ const supabaseAdmin = createClient(
 );
 
 /* -------------------------
-   SIGNUP (BULLETPROOF)
+   SIGNUP (SUPABASE v2 SAFE)
 -------------------------- */
 app.post("/signup", async (req, res) => {
   try {
     console.log("➡️ SIGNUP BODY:", req.body);
-    console.log("🔑 SERVICE KEY PRESENT:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-    console.log("🔑 SERVICE KEY LENGTH:", process.env.SUPABASE_SERVICE_ROLE_KEY?.length);
 
     const { email, password, full_name } = req.body;
 
@@ -64,19 +62,6 @@ app.post("/signup", async (req, res) => {
         .json({ error: "Password must be at least 6 characters" });
     }
 
-    /* 🔎 DUPLICATE EMAIL CHECK */
-    const { data: existingUser, error: existErr } =
-      await supabaseAdmin.auth.admin.getUserByEmail(email);
-
-    if (existErr) {
-      console.error("❌ EMAIL CHECK ERROR:", existErr);
-      return res.status(500).json({ error: "Email lookup failed" });
-    }
-
-    if (existingUser?.user) {
-      return res.status(409).json({ error: "User already exists" });
-    }
-
     /* ✅ CREATE AUTH USER (ADMIN) */
     const { data, error } =
       await supabaseAdmin.auth.admin.createUser({
@@ -86,11 +71,21 @@ app.post("/signup", async (req, res) => {
         user_metadata: { full_name }
       });
 
-    if (error || !data?.user) {
+    if (error) {
       console.error("❌ CREATE USER ERROR:", error);
-      return res
-        .status(500)
-        .json({ error: error?.message || "Create user failed" });
+
+      // ✅ duplicate email (Supabase v2)
+      if (error.code === "auth/user-already-exists") {
+        return res.status(409).json({ error: "User already exists" });
+      }
+
+      return res.status(500).json({
+        error: error.message || "Create user failed"
+      });
+    }
+
+    if (!data?.user) {
+      return res.status(500).json({ error: "User creation failed" });
     }
 
     const user = data.user;
@@ -124,7 +119,7 @@ app.post("/signup", async (req, res) => {
 });
 
 /* -------------------------
-   LOGIN (CORRECT)
+   LOGIN
 -------------------------- */
 app.post("/login", async (req, res) => {
   try {
