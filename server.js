@@ -7,9 +7,15 @@ import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
+/* -------------------------
+   ESM __dirname FIX
+-------------------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/* -------------------------
+   APP INIT
+-------------------------- */
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -29,7 +35,7 @@ const supabaseAdmin = createClient(
 );
 
 /* -------------------------
-   SIGNUP
+   SIGNUP (FIXED)
 -------------------------- */
 app.post("/signup", async (req, res) => {
   try {
@@ -47,39 +53,52 @@ app.post("/signup", async (req, res) => {
         .json({ error: "Password must be at least 6 characters" });
     }
 
-    // 🔎 block duplicate email
-    const { data: existing } =
+    // 🔎 Check duplicate email via auth
+    const { data: existingUser, error: existErr } =
       await supabaseAdmin.auth.admin.getUserByEmail(email);
 
-    if (existing?.user) {
+    if (existErr) {
+      console.error("❌ EMAIL CHECK ERROR:", existErr);
+      return res.status(500).json({ error: "Email check failed" });
+    }
+
+    if (existingUser?.user) {
       return res.status(409).json({ error: "User already exists" });
     }
 
-    // ✅ Supabase Auth signup
-    const { data, error } = await supabaseAnon.auth.signUp({
+    // ✅ Create auth user (ADMIN — avoids email confirmation + policy issues)
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: { full_name }
-      }
+      email_confirm: true,
+      user_metadata: { full_name }
     });
 
     if (error || !data.user) {
-      console.error("❌ SUPABASE SIGNUP ERROR:", error);
+      console.error("❌ SUPABASE CREATE USER ERROR:", error);
       return res
         .status(400)
         .json({ error: error?.message || "Signup failed" });
     }
 
-    // 🧾 create profile row
-    await supabaseAdmin.from("profiles").insert({
-      id: data.user.id,
-      email,
-      full_name,
-      role: "user",
-      tier: "free",
-      verified: false
-    });
+    const user = data.user;
+
+    // 🧾 Create profile row
+    const { error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .insert([{
+        id: user.id,
+        email,
+        full_name,
+        role: "user",
+        tier: "free",
+        verified: false
+      }]);
+
+    if (profileErr) {
+      console.error("❌ PROFILE INSERT ERROR:", profileErr);
+      return res.status(500).json({ error: "Profile creation failed" });
+    }
 
     console.log("✅ USER CREATED:", email);
 
@@ -92,7 +111,7 @@ app.post("/signup", async (req, res) => {
 });
 
 /* -------------------------
-   LOGIN
+   LOGIN (UNCHANGED, CORRECT)
 -------------------------- */
 app.post("/login", async (req, res) => {
   try {
@@ -172,6 +191,14 @@ app.get("/", (req, res) =>
 
 app.get("/listing6.6.html", (req, res) =>
   res.sendFile(path.join(__dirname, "listing6.6.html"))
+);
+
+app.get("/signup.html", (req, res) =>
+  res.sendFile(path.join(__dirname, "signup.html"))
+);
+
+app.get("/login.html", (req, res) =>
+  res.sendFile(path.join(__dirname, "login.html"))
 );
 
 /* -------------------------
