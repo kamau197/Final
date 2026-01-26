@@ -27,8 +27,10 @@ app.use(express.static(__dirname));
 console.log("🔍 ENV CHECK");
 console.log("SUPABASE_URL PRESENT:", !!process.env.SUPABASE_URL);
 console.log("SUPABASE_ANON_KEY PRESENT:", !!process.env.SUPABASE_ANON_KEY);
-console.log("SUPABASE_SERVICE_ROLE_KEY PRESENT:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-console.log("SERVICE ROLE KEY LENGTH:", process.env.SUPABASE_SERVICE_ROLE_KEY?.length);
+console.log(
+  "SUPABASE_SERVICE_ROLE_KEY PRESENT:",
+  !!process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 /* -------------------------
    SUPABASE CLIENTS
@@ -43,13 +45,15 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+/* =====================================================
+   AUTH
+===================================================== */
+
 /* -------------------------
-   SIGNUP (SUPABASE v2 SAFE)
+   SIGNUP
 -------------------------- */
 app.post("/signup", async (req, res) => {
   try {
-    console.log("➡️ SIGNUP BODY:", req.body);
-
     const { email, password, full_name } = req.body;
 
     if (!email || !password || !full_name) {
@@ -62,7 +66,6 @@ app.post("/signup", async (req, res) => {
         .json({ error: "Password must be at least 6 characters" });
     }
 
-    /* ✅ CREATE AUTH USER (ADMIN) */
     const { data, error } =
       await supabaseAdmin.auth.admin.createUser({
         email,
@@ -72,49 +75,34 @@ app.post("/signup", async (req, res) => {
       });
 
     if (error) {
-      console.error("❌ CREATE USER ERROR:", error);
-
-      // ✅ duplicate email (Supabase v2)
       if (error.code === "auth/user-already-exists") {
         return res.status(409).json({ error: "User already exists" });
       }
-
-      return res.status(500).json({
-        error: error.message || "Create user failed"
-      });
-    }
-
-    if (!data?.user) {
-      return res.status(500).json({ error: "User creation failed" });
+      return res.status(500).json({ error: error.message });
     }
 
     const user = data.user;
 
-    /* 🧾 CREATE PROFILE ROW */
     const { error: profileErr } = await supabaseAdmin
       .from("profiles")
-      .insert([
-        {
-          id: user.id,
-          email,
-          full_name,
-          role: "user",
-          tier: "free",
-          verified: false
-        }
-      ]);
+      .insert({
+        id: user.id,
+        email,
+        full_name,
+        role: "user",
+        tier: "free",
+        verified: false
+      });
 
     if (profileErr) {
-      console.error("❌ PROFILE INSERT ERROR:", profileErr);
       return res.status(500).json({ error: "Profile insert failed" });
     }
 
-    console.log("✅ USER CREATED:", email);
-    return res.json({ success: true });
+    res.json({ success: true });
 
   } catch (err) {
-    console.error("🔥 SIGNUP FATAL:", err);
-    return res.status(500).json({ error: "Internal signup error" });
+    console.error("🔥 SIGNUP ERROR:", err);
+    res.status(500).json({ error: "Internal signup error" });
   }
 });
 
@@ -123,8 +111,6 @@ app.post("/signup", async (req, res) => {
 -------------------------- */
 app.post("/login", async (req, res) => {
   try {
-    console.log("➡️ LOGIN BODY:", req.body);
-
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -138,25 +124,22 @@ app.post("/login", async (req, res) => {
       });
 
     if (error || !data?.session) {
-      console.error("❌ SUPABASE LOGIN ERROR:", error);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    console.log("✅ LOGIN OK:", email);
-
-    return res.json({
+    res.json({
       access_token: data.session.access_token,
       user: data.user
     });
 
   } catch (err) {
-    console.error("🔥 LOGIN FATAL:", err);
-    return res.status(500).json({ error: "Internal login error" });
+    console.error("🔥 LOGIN ERROR:", err);
+    res.status(500).json({ error: "Internal login error" });
   }
 });
 
 /* -------------------------
-   SUPABASE JWT AUTH GUARD
+   JWT AUTH GUARD
 -------------------------- */
 async function requireAuth(req, res, next) {
   try {
@@ -172,9 +155,7 @@ async function requireAuth(req, res, next) {
 
     req.user = data.user;
     next();
-
-  } catch (err) {
-    console.error("🔥 AUTH GUARD ERROR:", err);
+  } catch {
     return res.sendStatus(401);
   }
 }
@@ -190,15 +171,128 @@ app.get("/me", requireAuth, async (req, res) => {
       .eq("id", req.user.id)
       .single();
 
-  return res.json({
+  res.json({
     user: req.user,
     profile
   });
 });
 
+/* =====================================================
+   CHAT SYSTEM
+===================================================== */
+
 /* -------------------------
-   STATIC ROUTES
+   GET USER CHATS
 -------------------------- */
+app.get("/api/chats", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  const { data, error } = await supabaseAdmin
+    .from("chat_members")
+    .select(`
+      chat_id,
+      chats ( id, created_at )
+    `)
+    .eq("user_id", userId);
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(
+    data.map(row => ({
+      id: row.chat_id,
+      title: "Chat",
+      last_body: "",
+      last_timestamp: null,
+      unread: false
+    }))
+  );
+});
+
+/* -------------------------
+   CREATE / GET 1-ON-1 CHAT
+-------------------------- */
+app.post("/api/chat", requireAuth, async (req, res) => {
+  const userA = req.user.id;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: "Missing userId" });
+  }
+
+  const { data: existing } = await supabaseAdmin
+    .from("chat_members")
+    .select("chat_id")
+    .in("user_id", [userA, userId]);
+
+  if (existing?.length >= 2) {
+    return res.json({ chat_id: existing[0].chat_id });
+  }
+
+  const { data: chat } = await supabaseAdmin
+    .from("chats")
+    .insert({})
+    .select()
+    .single();
+
+  await supabaseAdmin.from("chat_members").insert([
+    { chat_id: chat.id, user_id: userA },
+    { chat_id: chat.id, user_id: userId }
+  ]);
+
+  res.json({ chat_id: chat.id });
+});
+
+/* -------------------------
+   GET MESSAGES
+-------------------------- */
+app.get("/api/messages", requireAuth, async (req, res) => {
+  const { chat_id } = req.query;
+
+  const { data, error } = await supabaseAdmin
+    .from("messages")
+    .select("*")
+    .eq("chat_id", chat_id)
+    .order("created_at");
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data);
+});
+
+/* -------------------------
+   SEND MESSAGE
+-------------------------- */
+app.post("/api/messages", requireAuth, async (req, res) => {
+  const { chat_id, content } = req.body;
+
+  if (!chat_id || !content) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("messages")
+    .insert({
+      chat_id,
+      sender_id: req.user.id,
+      content
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data);
+});
+
+/* =====================================================
+   STATIC ROUTES
+===================================================== */
 app.get("/", (req, res) =>
   res.sendFile(path.join(__dirname, "index.html"))
 );
