@@ -1,21 +1,27 @@
 /* =========================
-   Token helpers
+   AUTH STATE (GLOBAL)
 ========================= */
-function getToken() {
-  return localStorage.getItem("sb_jwt");
-}
 
-function clearToken() {
-  localStorage.removeItem("sb_jwt");
-}
+const AUTH_KEY = "sb_jwt";
+let authResolve;
+let authReject;
+
+/**
+ * Global promise that resolves ONLY when auth is ready
+ */
+window.authReady = new Promise((resolve, reject) => {
+  authResolve = resolve;
+  authReject = reject;
+});
 
 /* =========================
-   Page Guard
+   INTERNAL: LOAD USER
 ========================= */
-async function guardPage(allowedRoles = []) {
-  const token = getToken();
+async function loadAuthUser() {
+  const token = localStorage.getItem(AUTH_KEY);
 
   if (!token) {
+    authResolve(null);
     window.location.replace("login.html");
     return;
   }
@@ -27,72 +33,72 @@ async function guardPage(allowedRoles = []) {
       }
     });
 
-    if (!res.ok) throw new Error("Invalid token");
-
-    const data = await res.json();
-    window.currentUser = data;
-
-    // Role check (optional)
-    if (
-      allowedRoles.length &&
-      !allowedRoles.includes(data.profile?.role)
-    ) {
-      alert("Access denied");
-      window.location.replace("listing6.6.html");
+    if (!res.ok) {
+      throw new Error("Invalid session");
     }
 
-    // Populate UI if elements exist
-    hydrateUserUI(data);
+    const data = await res.json();
+
+    const user = {
+      id: data.user.id,
+      email: data.user.email,
+      role: data.profile?.role || "user",
+      tier: data.profile?.tier || "free",
+      verified: !!data.profile?.verified,
+      full_name: data.profile?.full_name || ""
+    };
+
+    window.currentUser = user;
+    authResolve(user);
 
   } catch (err) {
-    console.error("Auth failed:", err);
-    clearToken();
+    localStorage.removeItem(AUTH_KEY);
+    authResolve(null);
     window.location.replace("login.html");
   }
 }
 
 /* =========================
-   Populate User Info (Safe)
+   INIT AUTH (ON LOAD)
 ========================= */
-function hydrateUserUI(data) {
-  const nameEl = document.querySelector(".profile .name");
-  const emailEl = document.querySelector(".profile .email");
-  const avatarEls = document.querySelectorAll(".avatar");
-
-  const name =
-    data.profile?.full_name ||
-    data.user?.email?.split("@")[0] ||
-    "User";
-
-  if (nameEl) nameEl.textContent = name;
-  if (emailEl) emailEl.textContent = data.user.email;
-
-  avatarEls.forEach(el => {
-    if (el && name) {
-      el.textContent =
-        name
-          .split(" ")
-          .map(n => n[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase();
-    }
-  });
-}
+document.addEventListener("DOMContentLoaded", loadAuthUser);
 
 /* =========================
-   Logout (GLOBAL)
+   PUBLIC API
 ========================= */
+
+/**
+ * Returns authenticated user or null
+ */
+async function getUser() {
+  return await window.authReady;
+}
+
+/**
+ * Page guard
+ */
+async function requireAuth() {
+  const user = await getUser();
+  if (!user) {
+    window.location.replace("login.html");
+  }
+}
+
+/**
+ * Role guard
+ */
+async function requireRole(allowed = []) {
+  const user = await getUser();
+  if (!user || !allowed.includes(user.role)) {
+    alert("Access denied");
+    window.location.replace("listing6.6.html");
+  }
+}
+
+/**
+ * Logout everywhere
+ */
 function logout() {
-  clearToken();
+  localStorage.removeItem(AUTH_KEY);
   window.location.replace("login.html");
 }
-
-/* =========================
-   Auto-bind logout buttons
-========================= */
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("[data-logout]").forEach(btn => {
-    btn.addEventListener("click", logout);
-  });
-});
