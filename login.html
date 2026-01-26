@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Login</title>
-</head>
+
 <style>
 body {
   margin: 0;
@@ -61,6 +61,11 @@ button {
 
 a { color: #ff5d8f; cursor: pointer; }
 
+#msg {
+  margin-top: 14px;
+  font-weight: 600;
+}
+
 /* MODAL */
 .modal {
   display: none;
@@ -69,6 +74,10 @@ a { color: #ff5d8f; cursor: pointer; }
   background: rgba(0,0,0,0.4);
   justify-content: center;
   align-items: center;
+}
+
+.modal.show {
+  display: flex;
 }
 
 .modal-box {
@@ -83,14 +92,19 @@ a { color: #ff5d8f; cursor: pointer; }
 <body>
 
 <div class="panel">
-  <h1 id="typewriter" class="cursor"></h1>
+  <h1 id="typewriter" class="cursor">Welcome back</h1>
 </div>
 
 <div class="auth">
   <h2>Sign in</h2>
-  <input id="email" placeholder="Email">
+
+  <input id="email" type="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
+
   <button onclick="login()">Sign in</button>
+
+  <div id="msg"></div>
+
   <p><a onclick="openReset()">Forgot password?</a></p>
   <p><a href="signup.html">Create account</a></p>
 </div>
@@ -99,20 +113,41 @@ a { color: #ff5d8f; cursor: pointer; }
 <div class="modal" id="resetModal">
   <div class="modal-box">
     <h3>Password Reset</h3>
-    <input id="resetEmail" placeholder="Your email">
+    <input id="resetEmail" type="email" placeholder="Your email">
     <button onclick="resetPassword()">Send reset link</button>
   </div>
 </div>
 
 <script>
-async function login() {
-  const email =
-    document.getElementById("email").value.trim();
-  const password =
-    document.getElementById("password").value;
+function openReset() {
+  document.getElementById("resetModal").classList.add("show");
+}
 
+function closeReset() {
+  document.getElementById("resetModal").classList.remove("show");
+}
+
+async function resetPassword() {
+  const email = document.getElementById("resetEmail").value.trim();
+  if (!email) return alert("Enter your email");
+
+  await fetch("/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+
+  alert("If the email exists, a reset link was sent.");
+  closeReset();
+}
+
+async function login() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
   const msg = document.getElementById("msg");
+
   msg.innerText = "Logging in...";
+  msg.style.color = "#333";
 
   const res = await fetch("/login", {
     method: "POST",
@@ -128,7 +163,7 @@ async function login() {
     return;
   }
 
-  // 🔑 store Supabase JWT
+  // 🔑 Store Supabase JWT
   localStorage.setItem("sb_jwt", data.access_token);
 
   msg.innerText = "Login successful!";
@@ -141,4 +176,4 @@ async function login() {
 </script>
 
 </body>
-</html>
+  </html>
