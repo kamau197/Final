@@ -1,96 +1,98 @@
 /* =========================
-   Read stored Supabase JWT
+   Token helpers
 ========================= */
 function getToken() {
-  return localStorage.getItem('sb_jwt');
+  return localStorage.getItem("sb_jwt");
+}
+
+function clearToken() {
+  localStorage.removeItem("sb_jwt");
 }
 
 /* =========================
-   Require Auth (Page Guard)
+   Page Guard
 ========================= */
-async function requireAuth() {
+async function guardPage(allowedRoles = []) {
   const token = getToken();
 
   if (!token) {
-    window.location.replace('login.html');
+    window.location.replace("login.html");
     return;
   }
 
   try {
-    const res = await fetch('/me', {
+    const res = await fetch("/me", {
       headers: {
         Authorization: `Bearer ${token}`
       }
     });
 
-    if (!res.ok) {
-      localStorage.removeItem('sb_jwt');
-      window.location.replace('login.html');
-      return;
+    if (!res.ok) throw new Error("Invalid token");
+
+    const data = await res.json();
+    window.currentUser = data;
+
+    // Role check (optional)
+    if (
+      allowedRoles.length &&
+      !allowedRoles.includes(data.profile?.role)
+    ) {
+      alert("Access denied");
+      window.location.replace("listing6.6.html");
     }
 
-    const data = await res.json();
-    window.currentUser = data; // { user, profile }
+    // Populate UI if elements exist
+    hydrateUserUI(data);
 
   } catch (err) {
-    console.error('Auth check failed:', err);
-    localStorage.removeItem('sb_jwt');
-    window.location.replace('login.html');
+    console.error("Auth failed:", err);
+    clearToken();
+    window.location.replace("login.html");
   }
 }
 
 /* =========================
-   Get Current User (for UI)
+   Populate User Info (Safe)
 ========================= */
-async function getUser() {
-  const token = getToken();
-  if (!token) return null;
+function hydrateUserUI(data) {
+  const nameEl = document.querySelector(".profile .name");
+  const emailEl = document.querySelector(".profile .email");
+  const avatarEls = document.querySelectorAll(".avatar");
 
-  try {
-    const res = await fetch('/me', {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+  const name =
+    data.profile?.full_name ||
+    data.user?.email?.split("@")[0] ||
+    "User";
 
-    if (!res.ok) return null;
+  if (nameEl) nameEl.textContent = name;
+  if (emailEl) emailEl.textContent = data.user.email;
 
-    const data = await res.json();
-
-    return {
-      id: data.user.id,
-      email: data.user.email,
-      role: data.profile?.role || 'user',
-      tier: data.profile?.tier || 'free',
-      verified: data.profile?.verified || false,
-      full_name: data.profile?.full_name || ''
-    };
-  } catch (e) {
-    return null;
-  }
+  avatarEls.forEach(el => {
+    if (el && name) {
+      el.textContent =
+        name
+          .split(" ")
+          .map(n => n[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase();
+    }
+  });
 }
 
 /* =========================
-   Role Guard (Optional)
-========================= */
-async function requireRole(allowedRoles = []) {
-  const user = await getUser();
-
-  if (!user) {
-    window.location.replace('login.html');
-    return;
-  }
-
-  if (!allowedRoles.includes(user.role)) {
-    alert('Access denied');
-    window.location.replace('listing6.6.html');
-  }
-}
-
-/* =========================
-   Logout
+   Logout (GLOBAL)
 ========================= */
 function logout() {
-  localStorage.removeItem('sb_jwt');
-  window.location.href = 'login.html';
+  clearToken();
+  window.location.replace("login.html");
 }
+
+/* =========================
+   Auto-bind logout buttons
+========================= */
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-logout]").forEach(btn => {
+    btn.addEventListener("click", logout);
+  });
+});
