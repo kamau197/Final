@@ -4,16 +4,105 @@
   <meta charset="UTF-8">
   <title>Login</title>
 </head>
+<style>
+body {
+  margin: 0;
+  font-family: Inter, system-ui;
+  background: linear-gradient(120deg,#ffd6e8,#d7e3ff);
+  height: 100vh;
+  display: flex;
+}
+
+.panel {
+  flex: 1;
+  padding: 80px;
+  background: linear-gradient(135deg,#ff9a9e,#fad0c4,#fbc2eb);
+  color: #1f1f1f;
+}
+
+.panel h1 {
+  font-size: 42px;
+  font-weight: 800;
+}
+
+.cursor::after {
+  content: "|";
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.auth {
+  width: 420px;
+  background: rgba(255,255,255,0.9);
+  padding: 60px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+}
+
+input, button {
+  width: 100%;
+  padding: 14px;
+  margin-top: 14px;
+  border-radius: 10px;
+  border: none;
+}
+
+input {
+  background: #f4f6ff;
+}
+
+button {
+  background: linear-gradient(90deg,#ff758c,#ff7eb3);
+  font-weight: bold;
+  cursor: pointer;
+}
+
+a { color: #ff5d8f; cursor: pointer; }
+
+/* MODAL */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-box {
+  background: white;
+  padding: 30px;
+  width: 360px;
+  border-radius: 12px;
+}
+</style>
+</head>
+
 <body>
 
-<h2>Login</h2>
+<div class="panel">
+  <h1 id="typewriter" class="cursor"></h1>
+</div>
 
-<input id="email" type="email" placeholder="Email"><br><br>
-<input id="password" type="password" placeholder="Password"><br><br>
+<div class="auth">
+  <h2>Sign in</h2>
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">Sign in</button>
+  <p><a onclick="openReset()">Forgot password?</a></p>
+  <p><a href="signup.html">Create account</a></p>
+</div>
 
-<button onclick="login()">Login</button>
-
-<div id="msg" style="margin-top:10px;"></div>
+<!-- RESET MODAL -->
+<div class="modal" id="resetModal">
+  <div class="modal-box">
+    <h3>Password Reset</h3>
+    <input id="resetEmail" placeholder="Your email">
+    <button onclick="resetPassword()">Send reset link</button>
+  </div>
+</div>
 
 <script>
 async function login() {
