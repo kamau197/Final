@@ -19,19 +19,7 @@ body{
   padding:20px;
 }
 
-  .overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  display: none;
-  z-index: 90;
-  pointer-events: none;
-}
-
-body.sidebar-open .overlay {
-  display: block;
-  pointer-events: auto;
-}
+  
 /* layout */
 .container{display:flex;gap:18px;max-width:1200px;margin:0 auto;height:calc(100vh - 40px);}
 .chat-sidebar{width:300px;background:rgba(255,255,255,0.85);backdrop-filter: blur(6px);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 6px 18px rgba(18,52,71,0.06);}
@@ -454,8 +442,7 @@ body.sidebar-open #mainContent {
 </div>
  </div>
 
-<!-- Overlay -->
-<div id="overlay" class="overlay"></div>
+
 
 <!-- Sidebar toggle -->
 <button id="sidebarToggle" class="sidebar-toggle">&#9776;</button>
