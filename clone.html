@@ -586,223 +586,288 @@ body.sidebar-open #mainContent {
 
 <!-- Sidebar loads last -->
 <script src="sidebar.js"></script>
-  
+
   <script>
-/* ==============================
-   AUTH + CURRENT USER
-============================== */
-let me = null;
+/* =============================
+   AUTH (JWT – SAME AS LISTING 6.6)
+============================= */
+async function enforceAuth() {
+  const token = localStorage.getItem('sb_jwt');
 
-async function loadMe() {
-  const token = localStorage.getItem("sb_jwt");
   if (!token) {
-    location.href = "/login.html";
+    window.location.href = "/login.html";
     return;
   }
 
-  const res = await fetch("/me", {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  try {
+    const res = await fetch('/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
-  if (!res.ok) {
-    localStorage.removeItem("sb_jwt");
-    location.href = "/login.html";
-    return;
+    if (!res.ok) throw new Error("Auth failed");
+
+    const data = await res.json();
+
+    const allowedRoles = ["basic_user", "vendor", "admin", "legal"];
+    if (!allowedRoles.includes(data.profile?.role)) {
+      window.location.href = "/unauthorized.html";
+      return;
+    }
+
+    // ✅ GLOBAL USER (USED EVERYWHERE)
+    window.me = {
+      id: data.user.id,
+      name: data.profile.full_name || data.user.email
+    };
+
+    window.currentUser = data.user;
+    window.currentRole = data.profile.role;
+
+    init(); // 🚀 START CHAT AFTER AUTH
+
+  } catch (err) {
+    console.error("Auth error:", err);
+    localStorage.removeItem('sb_jwt');
+    window.location.href = "/login.html";
   }
-
-  const data = await res.json();
-
-  me = {
-    id: data.user.id,
-    name: data.profile?.full_name || data.user.email,
-    avatar: data.profile?.avatar || null
-  };
-
-  document.getElementById("myName").textContent = me.name;
-  document.getElementById("myAvatar").textContent =
-    me.name[0].toUpperCase();
 }
 
-/* ==============================
-   API ENDPOINTS (NODE)
-============================== */
+/* =============================
+   SIDEBAR
+============================= */
+const sidebar = document.getElementById("sidebar");
+const sidebarToggle = document.getElementById("sidebarToggle");
+const closeSidebarBtn = document.getElementById("closeSidebarBtn");
+const overlay = document.getElementById("overlay");
+const mainContent = document.getElementById("mainContent");
+
+function openSidebar() {
+  sidebar.style.left = "0";
+  mainContent.style.marginLeft = "250px";
+  sidebarToggle.style.display = "none";
+  if (window.innerWidth <= 768) overlay.style.display = "block";
+}
+
+function closeSidebar() {
+  sidebar.style.left = "-250px";
+  mainContent.style.marginLeft = "0";
+  sidebarToggle.style.display = "block";
+  overlay.style.display = "none";
+}
+
+sidebarToggle?.addEventListener("click", openSidebar);
+closeSidebarBtn?.addEventListener("click", closeSidebar);
+overlay?.addEventListener("click", closeSidebar);
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 768) overlay.style.display = "none";
+});
+
+/* =============================
+   CHAT CONFIG
+============================= */
 const API = {
-  chats: "/api/chats",
-  createChat: "/api/chat",
-  messages: "/api/messages"
+  base: '/api',
+  chats: '/chats.php',
+  messages: '/messages.php',
+  sendMessage: '/send_message.php',
+  createChat: '/create_chat.php',
+  markRead: '/mark_read.php',
+  getUser: '/get_user.php'
 };
 
-/* ==============================
-   ELEMENTS
-============================== */
-const chatsList = document.getElementById("chatsList");
-const messagesEl = document.getElementById("messages");
-const chatTitle = document.getElementById("chatTitle");
-const chatSub = document.getElementById("chatSub");
-const composer = document.getElementById("composer");
-const composerInput = document.getElementById("messageInput");
-const sendBtn = document.getElementById("sendBtn");
-const blankState = document.getElementById("blankState");
+const chatsList = document.getElementById('chatsList');
+const messagesEl = document.getElementById('messages');
+const chatHeader = document.getElementById('chatHeader');
+const chatTitle = document.getElementById('chatTitle');
+const chatSub = document.getElementById('chatSub');
+const chatAvatar = document.getElementById('chatAvatar');
+const composer = document.getElementById('composer');
+const composerInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const blankState = document.getElementById('blankState');
+const createChatBtn = document.getElementById('createChatBtn');
+const createChatModal = document.getElementById('createChatModal');
+const createChatConfirm = document.getElementById('createChatConfirm');
+const createChatCancel = document.getElementById('createChatCancel');
+const newChatUserId = document.getElementById('newChatUserId');
+const myAvatar = document.getElementById('myAvatar');
+const myName = document.getElementById('myName');
 
 let chats = [];
 let activeChat = null;
 let messages = [];
 let pollInterval = null;
 
-/* ==============================
+/* =============================
    HELPERS
-============================== */
-function fetchJSON(url, opts = {}) {
-  const token = localStorage.getItem("sb_jwt");
-  return fetch(url, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    }
-  }).then(r => {
+============================= */
+function fetchJSON(url, opts) {
+  return fetch(url, opts).then(r => {
     if (!r.ok) throw new Error("Network error");
     return r.json();
   });
 }
-
-function escapeHtml(s = "") {
-  return s.replace(/[&<>"']/g, m =>
-    ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, m =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])
   );
 }
+function formatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
-/* ==============================
+/* =============================
+   INIT
+============================= */
+function init() {
+  myName.textContent = window.me.name;
+  myAvatar.textContent = window.me.name[0].toUpperCase();
+
+  sendBtn.addEventListener('click', sendMessage);
+  composerInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  createChatBtn.addEventListener('click', () => {
+    createChatModal.style.display = 'flex';
+  });
+
+  createChatCancel.addEventListener('click', () => {
+    createChatModal.style.display = 'none';
+    newChatUserId.value = '';
+  });
+
+  createChatConfirm.addEventListener('click', createNewChat);
+
+  loadChats();
+}
+
+/* =============================
    LOAD CHATS
-============================== */
-async function loadChats() {
-  try {
-    const data = await fetchJSON(API.chats);
-    chats = data;
-    renderChats();
-  } catch {
-    chatsList.innerHTML = "<div class='muted'>Failed to load chats</div>";
-  }
+============================= */
+function loadChats() {
+  fetchJSON(API.base + API.chats)
+    .then(data => {
+      chats = data || [];
+      renderChats();
+    })
+    .catch(() => {});
 }
 
 function renderChats() {
-  chatsList.innerHTML = "";
-  chats.forEach(chat => {
-    const div = document.createElement("div");
-    div.className = "chat-item";
-    div.textContent = chat.title || "Chat";
-    div.onclick = () => openChat(chat);
+  chatsList.innerHTML = '';
+  chats.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'chat-item';
+    div.textContent = c.title || 'Chat';
+    div.onclick = () => openChat(c);
     chatsList.appendChild(div);
   });
 }
 
-/* ==============================
+/* =============================
    OPEN CHAT
-============================== */
+============================= */
 function openChat(chat) {
   activeChat = chat;
-  chatTitle.textContent = chat.title || "Chat";
-  chatSub.textContent = `Chat ID: ${chat.id}`;
-  blankState.style.display = "none";
-  composer.style.display = "flex";
+  chatHeader.style.display = 'block';
+  composer.style.display = 'flex';
+  blankState.style.display = 'none';
+
+  chatTitle.textContent = chat.title;
+  chatAvatar.textContent = chat.title[0].toUpperCase();
 
   loadMessages(chat.id);
 
   if (pollInterval) clearInterval(pollInterval);
-  pollInterval = setInterval(() => loadMessages(chat.id), 3000);
+  pollInterval = setInterval(() => {
+    loadMessages(chat.id);
+  }, 3000);
 }
 
-/* ==============================
-   LOAD MESSAGES
-============================== */
-async function loadMessages(chatId) {
-  try {
-    messages = await fetchJSON(`${API.messages}?chat_id=${chatId}`);
-    renderMessages();
-  } catch {
-    messagesEl.innerHTML = "<div class='muted'>Failed to load messages</div>";
-  }
+/* =============================
+   MESSAGES
+============================= */
+function loadMessages(chatId) {
+  fetchJSON(`${API.base}${API.messages}?chat_id=${chatId}`)
+    .then(data => {
+      messages = data || [];
+      renderMessages();
+    })
+    .catch(() => {});
 }
 
 function renderMessages() {
-  messagesEl.innerHTML = "";
+  messagesEl.innerHTML = '';
   messages.forEach(m => {
-    const div = document.createElement("div");
-    div.className = "msg " + (m.sender_id === me.id ? "me" : "other");
+    const div = document.createElement('div');
+    div.className = m.sender_id === window.me.id ? 'msg me' : 'msg other';
     div.innerHTML = `
-      <div>${escapeHtml(m.content)}</div>
-      <div class="msg-meta">
-        ${m.sender_id === me.id ? "You" : "User"} • 
-        ${new Date(m.created_at).toLocaleTimeString()}
-      </div>`;
+      <div>${escapeHtml(m.body)}</div>
+      <div class="msg-meta">${formatTime(m.timestamp)}</div>
+    `;
     messagesEl.appendChild(div);
   });
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-/* ==============================
+/* =============================
    SEND MESSAGE
-============================== */
-async function sendMessage() {
+============================= */
+function sendMessage() {
   if (!activeChat) return;
-  const content = composerInput.value.trim();
-  if (!content) return;
+  const body = composerInput.value.trim();
+  if (!body) return;
 
-  sendBtn.disabled = true;
-
-  try {
-    const msg = await fetchJSON(API.messages, {
-      method: "POST",
-      body: JSON.stringify({
-        chat_id: activeChat.id,
-        content
-      })
-    });
-
+  fetch(API.base + API.sendMessage, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: activeChat.id,
+      sender_id: window.me.id,
+      body
+    })
+  })
+  .then(r => r.json())
+  .then(msg => {
     messages.push(msg);
     renderMessages();
-    composerInput.value = "";
-  } catch {
-    alert("Message failed");
-  } finally {
-    sendBtn.disabled = false;
-  }
+    composerInput.value = '';
+  })
+  .catch(() => {});
 }
 
-/* ==============================
-   INIT
-============================== */
-(async function init() {
-  const user = await requireAuth();
-  if (!user) return;
+/* =============================
+   CREATE CHAT
+============================= */
+function createNewChat() {
+  const id = newChatUserId.value.trim();
+  if (!id) return alert("Enter user ID");
 
-  // hydrate sidebar + header
-  await hydrateSidebar();
+  fetch(API.base + API.createChat, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participant_id: id })
+  })
+  .then(r => r.json())
+  .then(chat => {
+    chats.push(chat);
+    renderChats();
+    createChatModal.style.display = 'none';
+    newChatUserId.value = '';
+  })
+  .catch(() => {});
+}
 
-  // Chat identity
-  me = {
-    id: user.id,
-    name: user.name,
-    avatar: user.avatar
-  };
-
-  document.getElementById("myName").textContent = me.name;
-  document.getElementById("myAvatar").textContent =
-    me.name[0].toUpperCase();
-
-  await loadChats();
-
-  sendBtn.addEventListener("click", sendMessage);
-  composerInput.addEventListener("keydown", e => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-})();
-
-</script>
-  
+/* 🚀 START */
+enforceAuth();
+  </script>
 
 
 </body>
