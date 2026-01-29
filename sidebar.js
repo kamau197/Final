@@ -28,12 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ],
     user: [
       { label: ` Listings`, link: "listing6.6.html" },
-      { label: ` Finance`, link: "finance2.html" },
       { label: ` Messages`, link: "clone.html" },
-      { label: ` Help`, link: "help.html" },
-      { label: ` Notifications`, link: "notif.html" },
-      { label: ` Contracts`, link: "contract.html" },
-      { label: ` Dashboard`, link: "upwork4.html" }
     ]
   };
 
