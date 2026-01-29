@@ -16,24 +16,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const roleMenus = {
     admin: [
-      { label: `<svg ...></svg> Admin`, link: "admin.html" },
-      { label: `<svg ...></svg> Listings`, link: "listing6.6.html" },
-      { label: `<svg ...></svg> Settings`, link: "s6.html" },
-      { label: `<svg ...></svg> Finance`, link: "finance2.html" },
-      { label: `<svg ...></svg> Messages`, link: "clone.html" },
+      { label: ` Admin`, link: "admin.html" },
+      { label: ` Listings`, link: "listing6.6.html" },
+      { label: ` Settings`, link: "s6.html" },
+      { label: ` Finance`, link: "finance2.html" },
+      { label: ` Messages`, link: "clone.html" },
       { label: `<svg ...></svg> Help`, link: "help.html" },
       { label: `<svg ...></svg> Notifications`, link: "notif.html" },
       { label: `<svg ...></svg> Contracts`, link: "contract.html" },
       { label: `<svg ...></svg> Dashboard`, link: "upwork4.html" }
     ],
     user: [
-      { label: `<svg ...></svg> Listings`, link: "listing6.6.html" },
-      { label: `<svg ...></svg> Finance`, link: "finance2.html" },
-      { label: `<svg ...></svg> Messages`, link: "clone.html" },
-      { label: `<svg ...></svg> Help`, link: "help.html" },
-      { label: `<svg ...></svg> Notifications`, link: "notif.html" },
-      { label: `<svg ...></svg> Contracts`, link: "contract.html" },
-      { label: `<svg ...></svg> Dashboard`, link: "upwork4.html" }
+      { label: ` Listings`, link: "listing6.6.html" },
+      { label: ` Finance`, link: "finance2.html" },
+      { label: ` Messages`, link: "clone.html" },
+      { label: ` Help`, link: "help.html" },
+      { label: ` Notifications`, link: "notif.html" },
+      { label: ` Contracts`, link: "contract.html" },
+      { label: ` Dashboard`, link: "upwork4.html" }
     ]
   };
 
