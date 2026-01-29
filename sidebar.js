@@ -42,12 +42,4 @@ document.addEventListener("DOMContentLoaded", async () => {
     menu.appendChild(li);
   });
 
-  // 🔓 Logout button (always visible)
-  const logoutLi = document.createElement("li");
-  logoutLi.innerHTML = `
-    <button class="nav-btn logout-btn" onclick="logout()">
-      🚪 Logout
-    </button>
-  `;
-  menu.appendChild(logoutLi);
-});
+ 
