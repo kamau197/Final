@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  /* ===== Your provided styles ===== */
+  :root{
+    --pink:#FFC1CC; --lav:#E6E6FA; --mint:#AAF0D1; --sky:#87CEEB;
+    --bg: #f9fafc; --card:#ffffffcc; --ink:#1f2937; --muted:#6b7280;
+    --ring: color-mix(in oklab, var(--sky) 55%, white);
+    --shadow: 0 8px 24px rgba(31,41,55,0.12); --radius: 16px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 1200px at -10% -20%, var(--lav) 0%, transparent 45%),
+      radial-gradient(1000px 1000px at 120% -10%, var(--pink) 0%, transparent 40%),
+      radial-gradient(800px 800px at 50% 120%, var(--mint) 0%, transparent 55%),
+      var(--bg);
+  }
+
+    /* Header */
+    .topbar{
+      display: flex;   
+      position: sticky; 
+      top:0; 
+      z-index: 10;
+      backdrop-filter: saturate(1.2) blur(8px);
+      background: color-mix(in oklab, white 80%, var(--lav) 20%);
+      border-bottom: 1px solid color-mix(in oklab, var(--lav) 60%, white);
+    }
+
+    .toprow{
+      display:flex; 
+      align-items:center; 
+      justify-content: space-between;
+      gap:16px;
+      padding: 12px 24px;
+      max-width: 1200px; 
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .brand{
+      display:flex; 
+      align-items:center; 
+      gap:10px; 
+      font-weight: 800;
+      letter-spacing:.2px;
+    }
+
+    .brand-badge{
+      width:32px;
+      height:32px;
+      border-radius:8px;
+      background: linear-gradient(135deg, var(--sky), var(--mint));
+      display:grid;
+      place-items:center;
+      color:#063449;
+      font-weight:900;
+      box-shadow: var(--shadow);
+}
+    button {
+      padding:10px 14px; 
+      border-radius:10px; 
+      border:1px solid transparent;
+      background: linear-gradient(180deg, var(--sky), color-mix(in oklab, var(--sky) 60%, white));
+      font-weight:700; 
+      cursor:pointer;
+    }
+
+    .tab button.active {
+      border: 1px solid #063449;
+    }
+ .logo {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      font-family: &#x27;Poppins&#x27;, sans-serif;
+    }
+    .logo svg {
+      width:40px;
+      height:40px;
+    }
+    .logo-text {
+      font-size:28px;
+      font-weight:700;
+      color:#1f2937;
+      letter-spacing:-1px;
+    }
+    .logo-text span {
+      background:linear-gradient(135deg, #AAF0D1, #87CEEB, #FFC1CC);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+    }
+    .count {
+      background: red;
+      color: white;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 6px;
+}
+  h1{font-size:28px;margin:24px 0 14px}
+  .subtle{color:var(--muted)}
+  .container{max-width:1200px;margin:0 auto;padding:24px;}
+  .grid{display:grid; gap:16px; grid-template-columns: repeat(12,1fr);}
+  .col-4{grid-column: span 4;}
+  @media (max-width: 1000px){ .col-4{grid-column: span 6} }
+  @media (max-width: 640px){ .col-4{grid-column: span 12} }
+  .card{background: linear-gradient(180deg, #fff, var(--card)); border:1px solid color-mix(in oklab, var(--lav) 60%, #e5e7eb); border-radius: var(--radius); padding:16px; box-shadow: var(--shadow);}
+  .card h3{margin:0 0 6px;font-size:16px;}
+  .btn{padding:10px 12px;border-radius:10px;border:1px solid transparent;background: linear-gradient(180deg, var(--sky), color-mix(in oklab, var(--sky) 60%, white));font-weight:700; cursor:pointer;}
+  .btn.secondary{background:white;border:1px solid color-mix(in oklab,var(--lav)50%,#d1d5db);font-weight:600;}
+  .modal-backdrop{position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:50; backdrop-filter: blur(4px); background: color-mix(in oklab, #000 20%, var(--lav) 50%);}
+  .modal{width:min(520px, 92vw); background:white; border-radius:20px; padding:20px; border:1px solid var(--ring); box-shadow: var(--shadow);}
+  .toast{position:fixed; right:18px; bottom:18px; z-index:60; display:flex; flex-direction:column; gap:8px;}
+  .toast .item{background: linear-gradient(90deg, var(--mint), white); border:1px solid color-mix(in oklab, var(--mint) 50%, #e5e7eb); padding:12px 14px; border-radius:12px; box-shadow: var(--shadow); animation: pop .2s ease-out;}
+  @keyframes pop{ from{ transform: translateY(8px); opacity:0 } to{ transform:none; opacity:1 } }
+  @keyframes fade-in {from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); }}
+  .animate-fade-in {animation: fade-in 0.3s ease-out;}
+  input{border:1px solid color-mix(in oklab,var(--lav)50%,#e5e7eb); padding:8px;border-radius:8px;width:100%; outline:none;}
+  
+      /* Footer */
+ .site-footer {
+  background: linear-gradient(180deg, var(--lav), white 70%);
+  margin-top: 40px;
+  padding: 40px 24px 20px;
+  color: var(--ink);
+  border-top: 1px solid color-mix(in oklab, var(--lav) 60%, #e5e7eb);
+  flex-shrink: 0;
+  width: 100%;
+}
+  .logo {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      font-family: &#x27;Poppins&#x27;, sans-serif;
+    }
+    .logo svg {
+      width:40px;
+      height:40px;
+    }
+    .logo-text {
+      font-size:28px;
+      font-weight:700;
+      color:#1f2937;
+      letter-spacing:-1px;
+    }
+    .logo-text span {
+      background:linear-gradient(135deg, #AAF0D1, #87CEEB, #FFC1CC);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+    }
+
+  .footer-container{
+    display:flex; flex-wrap:wrap; gap:40px;
+    max-width:1200px; margin:0 auto 30px;
+    justify-content:space-between;
+  }
+
+  .footer-brand{
+    display:flex; align-items:center; gap:12px;
+    font-weight:800;
+  }
+
+  .logo-text{ font-size:18px; font-weight:900 }
+
+  .footer-links{
+    display:grid; gap:20px; grid-template-columns: repeat(auto-fit,minmax(120px,1fr));
+    flex:1;
+  }
+
+  .footer-links h4{
+    font-size:14px; font-weight:700; margin:0 0 8px; color: var(--ink);
+  }
+
+  .footer-links a{
+    display:block; font-size:13px; color: var(--muted); margin:4px 0;
+  }
+
+  .footer-links a:hover{ color: var(--ink); }
+
+  .footer-bottom{
+    text-align:center;
+    border-top:1px solid color-mix(in oklab, var(--lav) 60%, #e5e7eb);
+    padding-top:16px;
+  }
+   
+
+/* --- Responsive tweaks --- */
+@media (max-width: 900px) {
+  .toprow { flex-wrap: wrap; gap: 10px; }
+  .search { flex: 1 1 100%; }
+  .actions { width: 100%; justify-content: flex-end; }
+  .grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .grid { grid-template-columns: 1fr; }
+  .search { order: 3; }
+  .actions { order: 2; }
+}
+
+
+  .social-icons{
+    display:flex; gap:12px; justify-content:center; margin-bottom:8px;
+  }
+
+  .social-icons a{
+    width:32px; height:32px; border-radius:50%;
+    border:1px solid var(--muted);
+    display:grid; place-items:center;
+    font-size:14px; color: var(--muted);
+  }
+
+  .social-icons a:hover{
+    background: var(--mint);
+    border-color: var(--mint);
+    color:#063449;
+  }
+/* -----------------------------
+   Sidebar
+   ----------------------------- */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -250px;
+  width: 250px;
+  height: 100%;
+  background
+        radial-gradient(1200px 1200px at -10% -20%, var(--lav) 0%, transparent 45%),
+        radial-gradient(1000px 1000px at 120% -10%, var(--pink) 0%, transparent 40%),
+        radial-gradient(800px 800px at 50% 120%, var(--mint) 0%, transparent 55%),
+        var(--bg);
+  
+ box-shadow:2px 0 15px rgba(0,0,0,0.05);
+  border-right: 1px solid color-mix(in oklab, var(--lav) 60%, #e5e7eb);
+  transition: left 0.3s ease;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content:space-between;
+  padding:20px;
+  backdrop-filter:blur(6px);
+}
+body.sidebar-open #sidebarToggle {
+  display: none;
+}
+
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid color-mix(in oklab, var(--lav) 60%, #e5e7eb);
+}
+
+.sidebar-header h2 { margin: 0; font-size: 20px; }
+.sidebar-header button { font-size: 24px; background: transparent; border: none; cursor:pointer; }
+
+.sidebar-menu { list-style: none; padding:0; margin:0; flex:1; }
+.sidebar-menu li a { display:block; padding:12px 16px; text-decoration:none; color: var(--ink); font-weight:600; border-radius:8px; margin:4px 8px; transition: background 0.2s; }
+.sidebar-menu li a:hover { background: var(--mint); color: #063449; }
+/* PROFILE */
+.profile {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:20px;
+}
+
+.profile .avatar {
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:linear-gradient(to bottom right,var(--pink),var(--lav));
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+  color:var(--ink);
+}
+
+.profile .info {
+  line-height:1.2;
+}
+
+.profile .info .name {
+  font-weight:600;
+}
+
+.profile .info .email {
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* NAVIGATION */
+nav {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.nav-btn {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 12px;
+  border:none;
+  background:none;
+  width:100%;
+  border-radius:10px;
+  text-align:left;
+  font-size:15px;
+  color:var(--ink);
+  cursor:pointer;
+  transition:background 0.2s;
+}
+
+.nav-btn:hover {
+  background:color-mix(in srgb,var(--sky) 40%,white);
+}
+
+.nav-btn .notif {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:red;
+  margin-left:auto;
+  animation:pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from {opacity:0.5;}
+  to {opacity:1;}
+}
+
+/* PREMIUM SECTION */
+.premium {
+  border-top:1px solid var(--lav);
+  margin-top:10px;
+  padding-top:10px;
+}
+
+.premium .nav-btn {
+  color:#b8860b;
+  font-weight:600;
+}
+
+.premium .nav-btn:hover {
+  background:color-mix(in srgb,var(--mint) 40%,white);
+}
+
+/* LOGOUT */
+.logout {
+  border-top:1px solid var(--lav);
+  padding-top:10px;
+}
+
+.logout-btn {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 12px;
+  border:none;
+  background:none;
+  color:var(--ink);
+  border-radius:10px;
+  cursor:pointer;
+  width:100%;
+  transition:background 0.2s;
+}
+
+.logout-btn:hover {
+  background:color-mix(in srgb,var(--pink) 40%,white);
+}
+
+/* Overlay for mobile */
+.overlay { position: fixed; inset:0; background: rgba(0,0,0,0.3); display:none; z-index: 90; }
+
+/* Toggle button */
+.sidebar-toggle { position: fixed; top:16px; left:16px; font-size:28px; border:none; background: var(--mint); color:#063449; padding:8px 12px; border-radius:8px; cursor:pointer; z-index:110; }
+
+body.sidebar-open #mainContent {
+  margin-left: 250px;
+  transition: margin-left 0.3s ease;
+}
+/* CALENDAR BUBBLE */
+.calendar-bubble{
+  position:relative;
+  font-size:22px;
+  cursor:pointer;
+}
+.count{
+  position:absolute;
+  top:-6px;
+  right:-6px;
+  background:red;
+  color:white;
+  font-size:11px;
+  padding:2px 6px;
+  border-radius:999px;
+}
+
+/* CALENDAR POPOVER */
+.calendar-popover{
+  position:absolute;
+  top:60px;
+  right:20px;
+  width:360px;
+  background:white;
+  border-radius:14px;
+  box-shadow:var(--shadow);
+  padding:12px;
+  z-index:100;
+}
+.hidden{display:none}
+
+/* CALENDAR GRID */
+.calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:6px;
+}
+.calendar-day{
+  height:38px;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  font-size:14px;
+}
+
+.day-pending{background:#fef9c3}
+.day-due{background:#e0f2fe}
+.day-paid{background:#dcfce7}
+.day-late{background:#fee2e2}
+
+/* SUMMARY */
+#calendarSummary{
+  margin-top:12px;
+  border-top:1px solid #e5e7eb;
+  padding-top:10px;
+}
+#calendarSummary p{
+  margin:6px 0;
+  font-size:14px;
+}
+
+/* BUTTON */
+.btn{
+  width:100%;
+  padding:10px;
+  margin-top:10px;
+  border:none;
+  border-radius:10px;
+  background:linear-gradient(180deg,var(--sky),#cfefff);
+  font-weight:700;
+  cursor:pointer;
+}
+
+/* Responsive */
+@media (max-width: 768px){
+  body.sidebar-open .container { margin-left:0; }
+  .overlay { display:block; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar" class="sidebar">
+  <div class="sidebar-header">
+   
+  
+  <!-- PROFILE -->
+    <div class="profile">
+      <div class="avatar">IK</div>
+      <div class="info">
+        <div class="name">Ibrahim</div>
+        <div class="email">ibrahim@email.com</div>
+     
+ </div>
+<button id="closeSidebarBtn">&times;</button>
+   </div>
+ </div>
+    <!-- NAVIGATION -->
+    <nav>
+      <ul id="menu"></ul>
+    </nav>
+
+    <!-- PREMIUM -->
+    <div class="premium">
+      <button class="nav-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+        Appeal
+      </button>
+
+      <button class="nav-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/><path d="m7.9 7.9 2.7 2.7"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/><path d="m13.4 10.6 2.7-2.7"/><circle cx="7.5" cy="16.5" r=".5" fill="currentColor"/><path d="m7.9 16.1 2.7-2.7"/><circle cx="16.5" cy="16.5" r=".5" fill="currentColor"/><path d="m13.4 13.4 2.7 2.7"/><circle cx="12" cy="12" r="2"/></svg>
+        Vault
+      </button>
+    </div>
+ 
+
+  <!-- LOGOUT -->
+  <div class="logout">
+    <button class="logout-btn">
+      <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m16 17 5-5-5-5'/><path d='M21 12H9'/><path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/></svg>
+      Logout
+    </button>
+  </div>
+</div>
+ </div>
+
+<!-- Sidebar toggle -->
+<button id="sidebarToggle" class="sidebar-toggle">&#9776;</button>
+
+<div class="container",id="container">
+<div id="mainContent">
+ <!---Top bar-->
+  <header class="topbar">
+    <div class="toprow">
+    <div class="logo">
+   
+    <!-- Icon -->
+    <span><svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <!-- Circle base -->
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#E6E6FA" stroke-width="6"/>
+      <!-- Crossing arcs to form "X bridge" -->
+      <path d="M20 30 Q50 60 80 30" stroke="#87CEEB" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M20 70 Q50 40 80 70" stroke="#AAF0D1" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <!-- Pink connector dots -->
+      <circle cx="20" cy="30" r="5" fill="#FFC1CC"/>
+      <circle cx="80" cy="30" r="5" fill="#FFC1CC"/>
+      <circle cx="20" cy="70" r="5" fill="#FFC1CC"/>
+      <circle cx="80" cy="70" r="5" fill="#FFC1CC"/>
+    </svg></span>
+
+    <!-- Text -->
+    <div class="logo-text">
+      Console<span>X</span>
+    </div>
+       <div class="calendar-bubble" onclick="toggleCalendar()">
+      📅
+      <span id="calendarNotif" class="count">0</span>
+    </div>
+  </div>
+</header>
+
+<div id="calendarPopover" class="calendar-popover hidden">
+  <div class="calendar-grid" id="calendar"></div>
+  <div id="calendarSummary"></div>
+</div>
+  </header>
+
+  <h1>Finance Dashboard</h1>
+
+  <!-- Balances -->
+  <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap:16px; margin-bottom:24px;">
+    <div class="card col-4">
+      <h3>Current Balance</h3>
+      <p id="currentBalance" style="font-size:22px; font-weight:bold; color:green;">Ksh 20000.00</p>
+    </div>
+    <div class="card col-4">
+      <h3>Escrow Balance</h3>
+      <p id="escrowBalance" style="font-size:22px; font-weight:bold; color:orange;">Ksh 5000.00</p>
+    </div>
+    <div class="card col-4">
+      <h3>Withdrawable</h3>
+      <p id="withdrawBalance" style="font-size:22px; font-weight:bold; color:blue;">Ksh 20000.00</p>
+      <button class="btn" onclick="openWithdrawModal()" style="margin-top:12px;">Withdraw</button>
+    </div>
+  </div>
+
+  <!-- Transaction History -->
+  <div class="card" style="margin-bottom:24px;">
+    <h3>Transaction History</h3>
+    <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:6px; border-bottom:1px solid var(--lav)">Date</th>
+          <th style="text-align:left; padding:6px; border-bottom:1px solid var(--lav)">Type</th>
+          <th style="text-align:right; padding:6px; border-bottom:1px solid var(--lav)">Amount (Ksh)</th>
+          <th style="text-align:right; padding:6px; border-bottom:1px solid var(--lav)">Balance</th>
+        </tr>
+      </thead>
+      <tbody id="transactionBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Chart -->
+  <div class="card">
+    <h3>Transaction Progress</h3>
+    <canvas id="financeChart" style="margin-top:12px;"></canvas>
+  </div>
+</div>
+ 
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <div class="logo">
+    <!-- Icon -->
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <!-- Circle base -->
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#E6E6FA" stroke-width="6"/>
+      <!-- Crossing arcs to form "X bridge" -->
+      <path d="M20 30 Q50 60 80 30" stroke="#87CEEB" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M20 70 Q50 40 80 70" stroke="#AAF0D1" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <!-- Pink connector dots -->
+      <circle cx="20" cy="30" r="5" fill="#FFC1CC"/>
+      <circle cx="80" cy="30" r="5" fill="#FFC1CC"/>
+      <circle cx="20" cy="70" r="5" fill="#FFC1CC"/>
+      <circle cx="80" cy="70" r="5" fill="#FFC1CC"/>
+    </svg>
+
+    <!-- Text -->
+    <div class="logo-text">
+      Console<span>X</span>
+    </div>
+  </div>
+          <div class="subtle">Strength in connection</div>
+        </div>
+      </div>
+   <div class="container">
+      <div class="footer-links">
+        <div>
+          <h4>Services</h4>
+          <a href="#">Custom Publishing </a>
+          <a href="#">Escrow Contracts</a>
+          <a href="#">Apeeal Requests</a>
+          <a href="#">Account Marketing</a>
+         </div>
+        <div>
+          <h4>Resources</h4>
+          <a href="#">Showcase</a>
+          <a href="#">Widgetkit</a>
+          <a href="#">Support</a>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <a href="#">About Us</a>
+          <a href="#">Contact</a>
+          <a href="#">Affiliates</a>
+        </div>
+      </div>
+    </div>
+    </div>
+  
+    <div class="footer-bottom">
+      <div class="social-icons">
+        <a href="#"><span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-facebook-icon lucide-facebook"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></span></a>
+        <a href="#"><span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-twitter-icon lucide-twitter"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg></span></a>
+        </div
+      <p>© Copyright. All rights reserved.</p>
+    </div>
+  </footer>
+</div>
+
+<!-- Withdraw Modal -->
+<div id="withdrawModal" class="modal-backdrop">
+  <div class="modal">
+    <h3>Withdraw Funds</h3>
+    <label>Amount</label>
+    <input id="withdrawAmount" type="number" placeholder="Enter amount">
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+      <button class="btn secondary" onclick="closeWithdrawModal()">Cancel</button>
+      <button class="btn" onclick="processWithdrawal()">Withdraw</button>
+    </div>
+  </div>
+</div>
+
+<!-- KYC Modal -->
+<div id="kycModal" class="modal-backdrop">
+  <div class="modal">
+    <h3>KYC Verification</h3>
+    <p class="subtle" style="margin-bottom:12px;">Please complete KYC before withdrawing funds.</p>
+    
+    <label>Full Name</label>
+    <input id="kycName" type="text" placeholder="Enter your full name">
+
+    <label style="margin-top:10px;">National ID / Passport</label>
+    <input id="kycId" type="text" placeholder="Enter ID or Passport number">
+
+    <label style="margin-top:10px;">Address</label>
+    <input id="kycAddress" type="text" placeholder="Enter your address">
+
+    <label style="margin-top:10px;">Upload Document</label>
+    <input id="kycFile" type="file" accept="image/*,application/pdf">
+
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
+      <button class="btn secondary" onclick="closeKycModal()">Cancel</button>
+      <button class="btn" onclick="submitKyc()">Submit</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- Toast Notifications -->
+<div id="toastContainer" class="toast"></div>
+
+
+<script>
+    import { supabase } from "/js/supabaseClient.js";
+
+/* =========================================================
+   AUTH GUARD (uses your existing pattern)
+========================================================= */
+async function enforceAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  const allowedRoles = ["basic_user", "vendor", "admin", "legal"];
+
+  if (!profile || !allowedRoles.includes(profile.role)) {
+    window.location.href = "/unauthorized.html";
+    return;
+  }
+
+  window.currentUser = session.user;
+  window.currentRole = profile.role;
+}
+
+await enforceAuth();
+
+/* =========================================================
+   SIDEBAR LOGIC (UNCHANGED)
+========================================================= */
+const sidebar = document.getElementById("sidebar");
+const sidebarToggle = document.getElementById("sidebarToggle");
+const closeSidebarBtn = document.getElementById("closeSidebarBtn");
+const overlay = document.getElementById("overlay");
+const mainContent = document.getElementById("mainContent");
+
+function openSidebar() {
+  sidebar.style.left = "0";
+  mainContent.style.marginLeft = "250px";
+  document.body.classList.add("sidebar-open");
+  sidebarToggle.style.display = "none";
+  if (window.innerWidth <= 768) overlay.style.display = "block";
+}
+
+function closeSidebar() {
+  sidebar.style.left = "-250px";
+  mainContent.style.marginLeft = "0";
+  document.body.classList.remove("sidebar-open");
+  sidebarToggle.style.display = "block";
+  if (window.innerWidth <= 768) overlay.style.display = "none";
+}
+
+sidebarToggle?.addEventListener("click", openSidebar);
+closeSidebarBtn?.addEventListener("click", closeSidebar);
+overlay?.addEventListener("click", () => {
+  if (window.innerWidth <= 768) closeSidebar();
+});
+
+/* =========================================================
+   FINANCE DASHBOARD LOGIC (UNCHANGED)
+========================================================= */
+let currentBalance = 5000;
+let escrowBalance = 2000;
+let withdrawBalance = 3000;
+
+let transactions = [
+  {date:"2025-08-01", type:"Deposit", amount:2000, balance:2000},
+  {date:"2025-08-05", type:"Deposit", amount:3000, balance:5000},
+  {date:"2025-08-10", type:"Escrow Hold", amount:2000, balance:3000},
+];
+
+function updateBalances() {
+  document.getElementById("currentBalance").innerText = `Ksh ${currentBalance.toFixed(2)}`;
+  document.getElementById("escrowBalance").innerText = `Ksh ${escrowBalance.toFixed(2)}`;
+  document.getElementById("withdrawBalance").innerText = `Ksh ${withdrawBalance.toFixed(2)}`;
+  updateTransactionTable();
+}
+
+function updateTransactionTable() {
+  const tbody = document.getElementById("transactionBody");
+  tbody.innerHTML = "";
+  transactions.slice().reverse().forEach(tx => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${tx.date}</td>
+      <td>${tx.type}</td>
+      <td style="text-align:right">${tx.amount.toFixed(2)}</td>
+      <td style="text-align:right">${tx.balance.toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+updateBalances();
+
+/* =========================================================
+   CALENDAR + CONTRACT MILESTONES (NEW, CLEAN)
+========================================================= */
+let contracts = [];
+
+/* Toggle calendar bubble */
+window.toggleCalendar = () => {
+  document.getElementById("calendarPopover")
+    .classList.toggle("hidden");
+};
+
+/* Load contracts (DATES ARE SOURCE OF TRUTH) */
+async function loadContracts(){
+  const { data, error } = await supabase
+    .from("contracts")
+    .select(`
+      id,
+      party_b,
+      app_id,
+      commission_percentage,
+      contract_type,
+      milestone_date,
+      milestone_label
+    `)
+    .eq("user_id", window.currentUser.id)
+    .eq("status","active");
+
+  if(error){
+    console.error("Contract load error:", error);
+    return;
+  }
+
+  contracts = data || [];
+  renderCalendar();
+}
+
+/* Revenue accumulated UNTIL milestone date */
+async function revenueUntil(appId, date){
+  const { data } = await supabase
+    .from("extensions")
+    .select("revenue, recorded_at")
+    .eq("app_id", appId)
+    .lte("recorded_at", date);
+
+  return (data || []).reduce((sum, r) => sum + r.revenue, 0);
+}
+
+/* Payment due calculation */
+async function calculateDue(contract){
+  const revenue = await revenueUntil(
+    contract.app_id,
+    contract.milestone_date
+  );
+  return revenue * (contract.commission_percentage / 100);
+}
+
+/* Status logic */
+function getStatus(contract){
+  const today = new Date();
+  const due = new Date(contract.milestone_date);
+
+  if (contract.paid) return "day-paid";
+  if (today < due) return "day-pending";
+  if (today > due) return "day-late";
+  return "day-due";
+}
+
+/* Render calendar using contract dates */
+function renderCalendar(){
+  const cal = document.getElementById("calendar");
+  cal.innerHTML = "";
+
+  contracts.forEach(contract=>{
+    const d = new Date(contract.milestone_date);
+
+    const el = document.createElement("div");
+    el.className = `calendar-day ${getStatus(contract)}`;
+    el.innerText = d.getDate();
+
+    el.onclick = () => showSummary(contract);
+    cal.appendChild(el);
+  });
+
+  document.getElementById("calendarNotif").innerText =
+    contracts.filter(c => new Date() >= new Date(c.milestone_date)).length;
+}
+
+/* Summary dropdown */
+async function showSummary(contract){
+  const isFuture = new Date() < new Date(contract.milestone_date);
+  const due = isFuture ? 0 : await calculateDue(contract);
+
+  document.getElementById("calendarSummary").innerHTML = `
+    <strong>${contract.milestone_label}</strong>
+
+    <p><b>Party B:</b> ${contract.party_b}</p>
+    <p><b>App ID:</b> ${contract.app_id}</p>
+    <p><b>Contract:</b> ${contract.contract_type}</p>
+    <p><b>Commission:</b> ${contract.commission_percentage}%</p>
+
+    <p><b>Status:</b>
+      ${isFuture ? "Pending revenue ⏳" : "Payment due"}
+    </p>
+
+    <p><b>Amount:</b>
+      ${isFuture ? "—" : `Ksh ${due.toFixed(2)}`}
+    </p>
+
+    ${
+      isFuture ? "" :
+      `<button class="btn" onclick="meetMilestone('${contract.id}')">
+        Meet milestone
+      </button>`
+    }
+  `;
+}
+
+/* Meet milestone */
+window.meetMilestone = async (contractId)=>{
+  await supabase.from("escrow_payments").insert({
+    contract_id: contractId,
+    paid_at: new Date()
+  });
+
+  alert("Milestone completed ✅");
+};
+
+/* INIT */
+loadContracts();
+</script>
+
+</body>
+</html>
