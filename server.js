@@ -197,6 +197,85 @@ app.get("/contracts", requireAuth, async (req, res) => {
 });
 
 /* =====================================================
+   CONTRACTS (✅ SUPPORT CONTRACT DRAFT PAGE)
+===================================================== */
+
+/* -------------------------
+   GET USER CONTRACTS
+-------------------------- */
+app.get("/contracts", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  const { data, error } = await supabaseAdmin
+    .from("contracts")
+    .select("*")
+    .or(`partyAId.eq.${userId},partyBId.eq.${userId}`)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("CONTRACT FETCH ERROR:", error);
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data || []);
+});
+
+/* -------------------------
+   CREATE NEW CONTRACT
+-------------------------- */
+app.post("/contracts", requireAuth, async (req, res) => {
+  try {
+    const contractData = req.body;
+
+    if (!contractData.partyA || !contractData.partyB || !contractData.contractType) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Add user who created the contract as partyA if not present
+    if (!contractData.partyAId) contractData.partyAId = req.user.id;
+
+    // Add created_at timestamp if not present
+    if (!contractData.created_at) contractData.created_at = new Date().toISOString();
+
+    const { data, error } = await supabaseAdmin
+      .from("contracts")
+      .insert([contractData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("CONTRACT INSERT ERROR:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ success: true, contract: data });
+  } catch (err) {
+    console.error("🔥 CONTRACT CREATE ERROR:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/* -------------------------
+   GET SINGLE CONTRACT BY ID
+-------------------------- */
+app.get("/contracts/:id", requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  const { data, error } = await supabaseAdmin
+    .from("contracts")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("FETCH SINGLE CONTRACT ERROR:", error);
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data);
+});
+
+/* =====================================================
    CHAT SYSTEM
 ===================================================== */
 
