@@ -27,10 +27,7 @@ app.use(express.static(__dirname));
 console.log("🔍 ENV CHECK");
 console.log("SUPABASE_URL PRESENT:", !!process.env.SUPABASE_URL);
 console.log("SUPABASE_ANON_KEY PRESENT:", !!process.env.SUPABASE_ANON_KEY);
-console.log(
-  "SUPABASE_SERVICE_ROLE_KEY PRESENT:",
-  !!process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+console.log("SUPABASE_SERVICE_ROLE_KEY PRESENT:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 /* -------------------------
    SUPABASE CLIENTS
@@ -61,9 +58,7 @@ app.post("/signup", async (req, res) => {
     }
 
     if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "Password must be at least 6 characters" });
+      return res.status(400).json({ error: "Password must be at least 6 characters" });
     }
 
     const { data, error } =
@@ -95,11 +90,11 @@ app.post("/signup", async (req, res) => {
       });
 
     if (profileErr) {
+      console.error("PROFILE INSERT ERROR:", profileErr);
       return res.status(500).json({ error: "Profile insert failed" });
     }
 
     res.json({ success: true });
-
   } catch (err) {
     console.error("🔥 SIGNUP ERROR:", err);
     res.status(500).json({ error: "Internal signup error" });
@@ -131,7 +126,6 @@ app.post("/login", async (req, res) => {
       access_token: data.session.access_token,
       user: data.user
     });
-
   } catch (err) {
     console.error("🔥 LOGIN ERROR:", err);
     res.status(500).json({ error: "Internal login error" });
@@ -155,7 +149,8 @@ async function requireAuth(req, res, next) {
 
     req.user = data.user;
     next();
-  } catch {
+  } catch (err) {
+    console.error("AUTH GUARD ERROR:", err);
     return res.sendStatus(401);
   }
 }
@@ -175,6 +170,30 @@ app.get("/me", requireAuth, async (req, res) => {
     user: req.user,
     profile
   });
+});
+
+/* =====================================================
+   CONTRACTS (✅ THIS FIXES YOUR PAGE)
+===================================================== */
+
+/* -------------------------
+   GET USER CONTRACTS
+-------------------------- */
+app.get("/contracts", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  const { data, error } = await supabaseAdmin
+    .from("contracts")
+    .select("*")
+    .or(`client_id.eq.${userId},provider_id.eq.${userId}`)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("CONTRACT FETCH ERROR:", error);
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data || []);
 });
 
 /* =====================================================
@@ -200,7 +219,7 @@ app.get("/api/chats", requireAuth, async (req, res) => {
   }
 
   res.json(
-    data.map(row => ({
+    (data || []).map(row => ({
       id: row.chat_id,
       title: "Chat",
       last_body: "",
@@ -260,7 +279,7 @@ app.get("/api/messages", requireAuth, async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
-  res.json(data);
+  res.json(data || []);
 });
 
 /* -------------------------
