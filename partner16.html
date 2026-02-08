@@ -114,6 +114,7 @@ hr{border:0;border-top:1px solid #e0e0e0;margin:8px 0}
 </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 <script>
 const qs = s => document.querySelector(s);
 const milestoneList = qs('#milestoneList');
@@ -131,6 +132,12 @@ const downloadBtn = qs('#downloadPreview');
 
 let milestoneCount = 0;
 
+// --- Supabase setup ---
+const supabaseUrl = "https://YOUR_SUPABASE_PROJECT_URL.supabase.co";
+const supabaseKey = "YOUR_SUPABASE_ANON_KEY";
+const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+// --- Utility functions ---
 function parseNum(v){const n=parseFloat(v);return Number.isFinite(n)?n:0;}
 function monthsBetween(s,e){
   if(!s||!e)return 1;
@@ -170,7 +177,6 @@ function addMilestone({title='New milestone',extra='',locked=false}={}){
   ensureCompleteAtBottom();
   renderPreview();
 }
-
 function monthsToRevenueMilestones(){
   const m=monthsBetween(startDate.value,endDate.value);
   let mult=0,type='';
@@ -178,7 +184,6 @@ function monthsToRevenueMilestones(){
   else if(escrowLedger.checked){mult=4;type='Escrow Ledger';}
   return Array.from({length:m*mult},(_,i)=>({title:`Revenue Release ${i+1}`,type}));
 }
-
 function addBaseMilestones(type){
   milestoneList.innerHTML='';
   milestoneCount=0;
@@ -234,7 +239,6 @@ function addBaseMilestones(type){
   ensureCompleteAtBottom();
   renderPreview();
 }
-
 function gatherMilestones(){
   return [...milestoneList.querySelectorAll('.ms-item')].map(n=>{
     const t=n.querySelector('.ms-title')?.value||'';
@@ -242,7 +246,6 @@ function gatherMilestones(){
     return {title:t,done:d};
   });
 }
-
 function renderPreview(){
   const A=qs('#partyA').value||'[Party A]',
         B=qs('#partyB').value||'[Party B]',
@@ -299,7 +302,6 @@ contractTypeSelect.addEventListener('change',()=>addBaseMilestones(contractTypeS
   })
 );
 
-// Live update for comment field
 qs('#comment').addEventListener('input', renderPreview);
 
 qs('#addMilestone').addEventListener('click',()=>addMilestone());
@@ -310,10 +312,39 @@ qs('#clearMilestones').addEventListener('click',()=>{
   ensureCompleteAtBottom();
   renderPreview();
 });
-finalizeBtn.addEventListener('click',()=>{
-  alert('Contract finalized and sealed!');
-  renderPreview();
+
+// === FINALIZE CONTRACT with Supabase and redirect ===
+finalizeBtn.addEventListener('click', async () => {
+  const contractData = {
+    partyA: qs('#partyA').value,
+    partyB: qs('#partyB').value,
+    partyAId: qs('#userId').value,
+    partyBId: qs('#partyBId').value,
+    startDate: qs('#startDate').value,
+    endDate: qs('#endDate').value,
+    publishingFee: parseNum(publishingFeeInput.value),
+    rentalFee: parseNum(rentalFeeInput.value),
+    rentalCommission: parseNum(rentalCommissionInput.value),
+    upfrontAmount: parseNum(upfrontInput.value),
+    contractType: contractTypeSelect.value,
+    revenueRelease: escrowAccount.checked ? 'Escrow Account' : (escrowLedger.checked ? 'Escrow Ledger' : 'None'),
+    comment: qs('#comment').value,
+    milestones: JSON.stringify(gatherMilestones()),
+    disclaimer: qs('#disclaimer').value,
+    created_at: new Date().toISOString()
+  };
+
+  const { data, error } = await supabase.from('contracts').insert([contractData]);
+  if (error) {
+    alert("Error saving contract: " + error.message);
+    console.error(error);
+  } else {
+    alert("Contract finalized and saved!");
+    renderPreview();
+    window.location.href = 'contract.html';
+  }
 });
+
 downloadBtn.addEventListener('click',()=>{
   const c=qs('#previewContent').innerHTML;
   const b=new Blob([`<html><head><meta charset='utf-8'><title>Contract Preview</title></head><body>${c}</body></html>`],{type:'text/html'});
@@ -328,3 +359,4 @@ renderPreview();
 
 </body>
 </html>
+
