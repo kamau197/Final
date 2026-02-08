@@ -32,7 +32,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     ],
     user: [
       { label: "Listings", link: "listing6.6.html" },
-      { label: "Messages", link: "clone.html" }
+      { label: "Messages", link: "clone.html" },
+      { label: "Contracts", link: "Contract.html" }
     ]
   };
 
